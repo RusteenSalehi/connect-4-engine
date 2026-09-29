@@ -1,0 +1,20 @@
+# Build output
+build/
+out/
+cmake-build-*/
+compile_commands.json
+
+# Editors and IDEs
+.vs/
+.idea/
+.vscode/
+
+# Python leftovers from the original PyCharm project
+.venv/
+
+# Private checkpoint reports (for review, not for the public repo)
+reports/
+
+# Web phase (later)
+node_modules/
+dist/
