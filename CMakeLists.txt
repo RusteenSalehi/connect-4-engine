@@ -51,6 +51,7 @@ FetchContent_MakeAvailable(doctest)
 
 add_executable(c4tests
   tests/test_main.cpp
+  tests/test_position.cpp
 )
 # SYSTEM marks doctest's headers as third-party, so our strict warning level does not
 # report warnings from code we do not own.
