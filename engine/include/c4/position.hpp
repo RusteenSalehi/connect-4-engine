@@ -5,6 +5,8 @@
 #include <string>
 #include <string_view>
 
+#include "c4/zobrist.hpp"
+
 namespace c4 {
 
 using Bitboard = std::uint64_t;
@@ -16,6 +18,10 @@ inline constexpr int HEIGHT = 6;
 // next column. That is what makes shift-and-AND win detection safe.
 inline constexpr int COLUMN_BITS = HEIGHT + 1;
 inline constexpr int MAX_MOVES = WIDTH * HEIGHT;  // 42
+
+// zobrist.hpp cannot include this header (this header includes it), so it states the board size
+// on its own. This check keeps the two in sync.
+static_assert(zobrist::SQUARES == WIDTH * COLUMN_BITS);
 
 // Bit index of (col, row), with row 0 at the bottom.
 constexpr int bitIndex(int col, int row) { return col * COLUMN_BITS + row; }
@@ -71,6 +77,10 @@ public:
     // next column. Knowing h per column gives the stone count, which gives the side to move.
     std::uint64_t key() const { return current_ + mask_; }
 
+    // Zobrist hash, maintained incrementally by play(). Unlike key() it can collide, but its bits
+    // are uniformly mixed, which makes it a good transposition table index.
+    std::uint64_t hash() const { return hash_; }
+
     Bitboard current() const { return current_; }  // stones of the side to move
     Bitboard mask() const { return mask_; }         // all stones
     Bitboard opponent() const { return current_ ^ mask_; }
@@ -95,6 +105,7 @@ private:
     Bitboard current_ = 0;
     Bitboard mask_ = 0;
     int moves_ = 0;
+    std::uint64_t hash_ = 0;  // the empty board hashes to 0 (XOR of no keys)
 };
 
 }  // namespace c4

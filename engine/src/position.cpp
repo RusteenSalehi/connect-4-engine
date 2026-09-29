@@ -1,5 +1,7 @@
 #include "c4/position.hpp"
 
+#include <bit>
+
 namespace c4 {
 
 bool hasFourInARow(Bitboard stones) {
@@ -33,6 +35,9 @@ std::optional<Position> Position::fromString(std::string_view moves) {
 
 void Position::play(int col) {
     Bitboard stone = nextStone(col);
+    // The mover's absolute index is the parity of the stone count before the move: the first
+    // player moves on plies 0, 2, 4, ... XOR-ing its key in is all the hash update needs.
+    hash_ ^= zobrist::pieceKey(moves_ % 2, std::countr_zero(stone));
     // After the move it is the opponent's turn, so "current" must become the opponent's stones.
     // XOR with the old mask gives exactly those (the new stone is not in the old mask, so it
     // correctly ends up belonging to the player who just moved, now the "opponent").
@@ -59,6 +64,8 @@ Position Position::mirror() const {
         m.mask_ |= moveColumn(mask_);
     }
     m.moves_ = moves_;
+    // Mirroring moves every stone to a new bit, so the hash is rebuilt rather than patched.
+    m.hash_ = zobrist::hashFromScratch(m.firstPlayerStones(), m.secondPlayerStones());
     return m;
 }
 
