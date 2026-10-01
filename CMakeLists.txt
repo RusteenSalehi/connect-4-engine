@@ -30,9 +30,18 @@ endfunction()
 add_library(c4engine STATIC
   engine/src/position.cpp
   engine/src/zobrist.cpp
+  engine/src/tt.cpp
 )
 target_include_directories(c4engine PUBLIC engine/include)
 c4_set_warnings(c4engine)
+
+# Debug aid: store each position's perfect key next to its TT entry and count Zobrist collisions
+# (same 64-bit hash, different position). PUBLIC so tests and tools see the same setting as the
+# library; a mismatch would give the TT class two different layouts in one program.
+option(C4_TT_VERIFY "Count Zobrist collisions in the transposition table" OFF)
+if(C4_TT_VERIFY)
+  target_compile_definitions(c4engine PUBLIC C4_TT_VERIFY)
+endif()
 
 # ---------------------------------------------------------------------------------------------
 # Tests (doctest, pinned to a release tag so every checkout builds against identical code)
@@ -54,6 +63,7 @@ add_executable(c4tests
   tests/test_main.cpp
   tests/test_position.cpp
   tests/test_zobrist.cpp
+  tests/test_tt.cpp
 )
 # SYSTEM marks doctest's headers as third-party, so our strict warning level does not
 # report warnings from code we do not own.
