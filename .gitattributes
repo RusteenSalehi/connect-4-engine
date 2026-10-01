@@ -1,0 +1,17 @@
+# Let git detect text files and store them with LF in the repository.
+* text=auto
+
+# Source and config files always check out with LF, on every platform and regardless of the
+# local core.autocrlf setting, so diffs never show whole-file line ending changes.
+*.cpp            text eol=lf
+*.hpp            text eol=lf
+*.h              text eol=lf
+*.cmake          text eol=lf
+CMakeLists.txt   text eol=lf
+*.json           text eol=lf
+*.md             text eol=lf
+*.yml            text eol=lf
+*.yaml           text eol=lf
+.gitignore       text eol=lf
+.gitattributes   text eol=lf
+LICENSE          text eol=lf
