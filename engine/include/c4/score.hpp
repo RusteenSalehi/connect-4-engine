@@ -15,10 +15,6 @@ inline constexpr int WIN_SCORE = 10000;
 // +/- WIN_SCORE. Anything at least this large in magnitude is a proven result, not a heuristic.
 inline constexpr int MIN_WIN_SCORE = WIN_SCORE - MAX_MOVES;
 
-// Heuristic evaluation is clamped to this magnitude, leaving a wide gap below the mate range so
-// an evaluation can never be mistaken for a proven win or loss, whatever weights are used.
-inline constexpr int EVAL_LIMIT = WIN_SCORE / 2;
-
 // Larger than any real score; used as the initial alpha-beta window.
 inline constexpr int INF_SCORE = WIN_SCORE + 1;
 

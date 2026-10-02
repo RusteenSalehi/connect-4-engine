@@ -1,6 +1,5 @@
 #include "c4/eval.hpp"
 
-#include <algorithm>
 #include <bit>
 
 namespace c4 {
@@ -28,8 +27,7 @@ int evalFor(Bitboard own, Bitboard opp, Bitboard mask, const EvalWeights& weight
     }
     const Bitboard center = columnMask(CENTER_COLUMN);
     score += weights.centerStone * (std::popcount(own & center) - std::popcount(opp & center));
-    // Symmetric clamp, so antisymmetry survives even for extreme custom weights.
-    return std::clamp(score, -EVAL_LIMIT, EVAL_LIMIT);
+    return score;
 }
 
 }  // namespace c4

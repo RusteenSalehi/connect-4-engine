@@ -52,16 +52,13 @@ bool Position::isWinningMove(int col) const {
 
 Position Position::mirror() const {
     Position m;
+    const Bitboard lowColumn = columnMask(0);
     for (int col = 0; col < WIDTH; ++col) {
-        int shift = (WIDTH - 1 - 2 * col) * COLUMN_BITS;
-        // Move column col to column WIDTH - 1 - col. The shift direction depends on which half
-        // of the board the column is in, and C++ has no negative shift, hence the branch.
-        auto moveColumn = [&](Bitboard b) {
-            Bitboard bits = b & columnMask(col);
-            return shift >= 0 ? bits << shift : bits >> -shift;
-        };
-        m.current_ |= moveColumn(current_);
-        m.mask_ |= moveColumn(mask_);
+        // Bring column col down to bits 0..5, then lift it into column WIDTH - 1 - col.
+        const int from = bitIndex(col, 0);
+        const int to = bitIndex(WIDTH - 1 - col, 0);
+        m.current_ |= ((current_ >> from) & lowColumn) << to;
+        m.mask_ |= ((mask_ >> from) & lowColumn) << to;
     }
     m.moves_ = moves_;
     // Mirroring moves every stone to a new bit, so the hash is rebuilt rather than patched.

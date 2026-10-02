@@ -56,7 +56,7 @@ constexpr std::array<Bitboard, WINDOW_COUNT> makeWindows() {
 inline constexpr std::array<Bitboard, WINDOW_COUNT> WINDOWS = detail::makeWindows();
 
 // Scores the stones `own` against `opp` (mask = own | opp). Positive is good for `own`.
-// The result is clamped to [-EVAL_LIMIT, EVAL_LIMIT], far below the mate range.
+// A test checks that the weights keep every possible result below the mate range.
 int evalFor(Bitboard own, Bitboard opp, Bitboard mask, const EvalWeights& weights = {});
 
 // Heuristic score of a non-terminal position, from the side to move's point of view.

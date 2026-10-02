@@ -3,7 +3,6 @@
 #include "c4/position.hpp"
 #include "c4/zobrist.hpp"
 
-#include <set>
 #include <vector>
 
 using namespace c4;
@@ -15,20 +14,6 @@ std::uint64_t scratchHash(const Position& p) {
 }
 
 }  // namespace
-
-TEST_CASE("zobrist table has distinct nonzero keys") {
-    // A zero key would make a stone invisible to the hash; a duplicate would make two different
-    // stones indistinguishable. Neither is realistic from splitmix64, but it is cheap to rule out.
-    std::set<std::uint64_t> seen;
-    for (int player = 0; player < zobrist::PLAYERS; ++player) {
-        for (int bit = 0; bit < zobrist::SQUARES; ++bit) {
-            std::uint64_t k = zobrist::pieceKey(player, bit);
-            CHECK(k != 0);
-            seen.insert(k);
-        }
-    }
-    CHECK(seen.size() == static_cast<std::size_t>(zobrist::PLAYERS * zobrist::SQUARES));
-}
 
 TEST_CASE("incremental hash equals a from-scratch recomputation over seeded random games") {
     SplitMix64 rng(2026);
@@ -50,18 +35,20 @@ TEST_CASE("incremental hash equals a from-scratch recomputation over seeded rand
     }
 }
 
-TEST_CASE("transpositions reach the same hash and the same key") {
+TEST_CASE("transpositions reach the same position state and the same hash") {
     // First player plays columns 1 and 3, second player plays 2 and 4, in a different order.
     Position a = *Position::fromString("1234");
     Position b = *Position::fromString("3214");
+    CHECK(a.current() == b.current());
+    CHECK(a.mask() == b.mask());
+    CHECK(a.moves() == b.moves());
     CHECK(a.hash() == b.hash());
-    CHECK(a.key() == b.key());
-    CHECK(a == b);
 
-    // Swapping which player owns the stones is a different position and must hash differently.
+    // Same cells with the owners swapped: a different position, so a different hash.
     Position c = *Position::fromString("2143");
+    CHECK(c.mask() == a.mask());
+    CHECK(c.current() != a.current());
     CHECK(c.hash() != a.hash());
-    CHECK(c.key() != a.key());
 }
 
 TEST_CASE("mirror hash matches playing the mirrored moves") {

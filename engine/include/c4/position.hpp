@@ -69,16 +69,9 @@ public:
     // Number of stones on the board (plies played).
     int moves() const { return moves_; }
 
-    // A perfect key: two different positions never share a key.
-    // Why it is unique: in a column holding h stones, the mask bits are the value 2^h - 1 and the
-    // side-to-move's bits are some value c in [0, 2^h - 1]. Their sum lies in [2^h - 1, 2^(h+1) - 2],
-    // and those ranges do not overlap for different h, so the sum reveals both h and c. The
-    // largest sum (h = 6) is 126, which still fits in the column's 7 bits, so no carry reaches the
-    // next column. Knowing h per column gives the stone count, which gives the side to move.
-    std::uint64_t key() const { return current_ + mask_; }
-
-    // Zobrist hash, maintained incrementally by play(). Unlike key() it can collide, but its bits
-    // are uniformly mixed, which makes it a good transposition table index.
+    // Zobrist hash, maintained incrementally by play(). Two different positions can share a hash,
+    // but with 64 bits that is rare enough to ignore, and its uniformly mixed bits make it a good
+    // transposition table index.
     std::uint64_t hash() const { return hash_; }
 
     Bitboard current() const { return current_; }  // stones of the side to move

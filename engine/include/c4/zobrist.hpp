@@ -47,14 +47,12 @@ inline constexpr int SQUARES = 49;
 // of the pieces, so it needs its own key. In Connect-4 the side to move is fully determined by
 // the number of stones (even = first player), and the stones are already in the hash, so a
 // side-to-move key would add nothing.
-struct Table {
-    std::array<std::array<std::uint64_t, SQUARES>, PLAYERS> keys{};
-};
+using Table = std::array<std::array<std::uint64_t, SQUARES>, PLAYERS>;
 
 constexpr Table makeTable() {
-    Table t;
+    Table t{};
     SplitMix64 rng(SEED);
-    for (auto& player : t.keys) {
+    for (auto& player : t) {
         for (auto& key : player) {
             key = rng.next();
         }
@@ -66,7 +64,7 @@ constexpr Table makeTable() {
 // startup cost.
 inline constexpr Table TABLE = makeTable();
 
-constexpr std::uint64_t pieceKey(int player, int bit) { return TABLE.keys[player][bit]; }
+constexpr std::uint64_t pieceKey(int player, int bit) { return TABLE[player][bit]; }
 
 // Hash computed from nothing but the stones. play() maintains the same value incrementally;
 // this function is the reference that tests compare against, and mirror() uses it.

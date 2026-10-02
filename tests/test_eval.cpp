@@ -5,7 +5,9 @@
 #include "c4/score.hpp"
 #include "c4/zobrist.hpp"
 
+#include <algorithm>
 #include <bit>
+#include <cstdlib>
 #include <set>
 #include <vector>
 
@@ -76,17 +78,21 @@ TEST_CASE("evaluation is mirror symmetric") {
     }
 }
 
-TEST_CASE("evaluation stays far below the mate range") {
+TEST_CASE("the largest possible evaluation stays below the mate range") {
+    // Upper bound on |evalFor| for the default weights. A window scores for at most one side
+    // (an open three or two leaves no room for the other player's stones), so each of the 69
+    // windows adds at most the larger window weight. The center term is a difference of at most
+    // HEIGHT stones. If tuning ever raises the weights too far, this test fails instead of the
+    // search silently treating a heuristic score as a proven win.
+    const EvalWeights w;
+    const int maxWindow = std::max(std::abs(w.threeOpen), std::abs(w.twoOpen));
+    const int maxEval = WINDOW_COUNT * maxWindow + HEIGHT * std::abs(w.centerStone);
+    CHECK(maxEval < MIN_WIN_SCORE);
+
+    // The bound must really be a bound: no actual position exceeds it.
     for (const Position& p : randomPositions(500, 13)) {
-        CHECK_FALSE(isMateScore(evaluate(p)));
-        CHECK(evaluate(p) <= EVAL_LIMIT);
-        CHECK(evaluate(p) >= -EVAL_LIMIT);
+        CHECK(std::abs(evaluate(p)) <= maxEval);
     }
-    // Even absurd weights are clamped.
-    EvalWeights huge{1000000, 1000000, 1000000};
-    Bitboard own = cell(0, 0) | cell(1, 0) | cell(2, 0) | cell(3, 1);
-    CHECK(evalFor(own, 0, own, huge) == EVAL_LIMIT);
-    CHECK(evalFor(0, own, own, huge) == -EVAL_LIMIT);
 }
 
 TEST_CASE("adding an open three increases its owner's score") {

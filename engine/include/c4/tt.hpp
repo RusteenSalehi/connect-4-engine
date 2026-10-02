@@ -43,10 +43,7 @@ struct TTHit {
 
 struct TTStats {
     std::uint64_t probes = 0;
-    std::uint64_t hits = 0;        // probes whose stored hash matched
-    std::uint64_t stores = 0;
-    std::uint64_t overwrites = 0;  // stores that replaced a different position's entry
-    std::uint64_t collisions = 0;  // hits whose perfect key differed (C4_TT_VERIFY builds only)
+    std::uint64_t hits = 0;  // probes whose stored hash matched
 };
 
 // Mate scores are root-relative ("win at ply p from the root"), but a TT entry may be reused
@@ -71,8 +68,8 @@ std::optional<int> usableScore(const TTHit& hit, int depth, int alpha, int beta)
 
 class TranspositionTable {
 public:
-    // entryCount must be a power of two, so the index is a cheap mask instead of a modulo.
-    explicit TranspositionTable(std::size_t entryCount = std::size_t{1} << 20);
+    // 2^sizeLog2 entries. A power-of-two size makes the index a cheap mask instead of a modulo.
+    explicit TranspositionTable(int sizeLog2 = 20);
 
     // Looks up pos. `ply` is the node's distance from the search root, used for mate scores.
     std::optional<TTHit> probe(const Position& pos, int ply);
@@ -83,7 +80,6 @@ public:
 
     // Empties every slot and resets the statistics.
     void clear();
-    void resetStats() { stats_ = {}; }
 
     const TTStats& stats() const { return stats_; }
     std::size_t size() const { return entries_.size(); }
@@ -92,11 +88,6 @@ private:
     std::size_t indexOf(std::uint64_t hash) const { return hash & (entries_.size() - 1); }
 
     std::vector<TTEntry> entries_;
-#ifdef C4_TT_VERIFY
-    // The perfect key of each slot's position, kept in a parallel array so TTEntry stays 16
-    // bytes and the normal build's memory layout is unchanged.
-    std::vector<std::uint64_t> verifyKeys_;
-#endif
     TTStats stats_;
 };
 

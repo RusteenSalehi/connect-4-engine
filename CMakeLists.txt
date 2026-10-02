@@ -36,14 +36,6 @@ add_library(c4engine STATIC
 target_include_directories(c4engine PUBLIC engine/include)
 c4_set_warnings(c4engine)
 
-# Debug aid: store each position's perfect key next to its TT entry and count Zobrist collisions
-# (same 64-bit hash, different position). PUBLIC so tests and tools see the same setting as the
-# library; a mismatch would give the TT class two different layouts in one program.
-option(C4_TT_VERIFY "Count Zobrist collisions in the transposition table" OFF)
-if(C4_TT_VERIFY)
-  target_compile_definitions(c4engine PUBLIC C4_TT_VERIFY)
-endif()
-
 # ---------------------------------------------------------------------------------------------
 # Tests (doctest, pinned to a release tag so every checkout builds against identical code)
 # ---------------------------------------------------------------------------------------------
