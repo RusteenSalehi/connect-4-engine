@@ -80,3 +80,7 @@ c4_set_warnings(c4bench)
 add_executable(c4cli cli/cli.cpp)
 target_link_libraries(c4cli PRIVATE c4engine)
 c4_set_warnings(c4cli)
+
+add_executable(c4tune tune/tune.cpp)
+target_link_libraries(c4tune PRIVATE c4engine)
+c4_set_warnings(c4tune)
