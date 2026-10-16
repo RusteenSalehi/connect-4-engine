@@ -32,6 +32,7 @@ add_library(c4engine STATIC
   engine/src/zobrist.cpp
   engine/src/tt.cpp
   engine/src/eval.cpp
+  engine/src/search.cpp
 )
 target_include_directories(c4engine PUBLIC engine/include)
 c4_set_warnings(c4engine)
@@ -58,6 +59,7 @@ add_executable(c4tests
   tests/test_zobrist.cpp
   tests/test_tt.cpp
   tests/test_eval.cpp
+  tests/test_search.cpp
 )
 # SYSTEM marks doctest's headers as third-party, so our strict warning level does not
 # report warnings from code we do not own.
