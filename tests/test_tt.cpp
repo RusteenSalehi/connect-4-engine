@@ -4,19 +4,10 @@
 #include "c4/score.hpp"
 #include "c4/tt.hpp"
 
-#include <string>
+#include "test_util.hpp"
 
 using namespace c4;
-
-namespace {
-
-Position parse(const std::string& s) {
-    auto p = Position::fromString(s);
-    REQUIRE(p.has_value());
-    return *p;
-}
-
-}  // namespace
+using c4::test::parse;
 
 TEST_CASE("TT store/probe round trip") {
     TranspositionTable tt(10);

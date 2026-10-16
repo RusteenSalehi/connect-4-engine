@@ -6,7 +6,10 @@
 #include <string>
 #include <utility>
 
+#include "test_util.hpp"
+
 using namespace c4;
+using c4::test::parse;
 
 namespace {
 
@@ -42,12 +45,6 @@ bool naiveFour(Bitboard b) {
         }
     }
     return false;
-}
-
-Position parse(const std::string& s) {
-    auto p = Position::fromString(s);
-    REQUIRE(p.has_value());
-    return *p;
 }
 
 }  // namespace
