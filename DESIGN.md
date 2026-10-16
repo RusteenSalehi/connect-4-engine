@@ -1,0 +1,193 @@
+# Design
+
+How the engine works and why it is built this way. Build and usage instructions are in the
+[README](README.md).
+
+## Layout
+
+```
+engine/include/c4/   public headers        engine/src/   implementation
+  position.hpp       bitboard board          position.cpp
+  zobrist.hpp        hashing, splitmix64     zobrist.cpp
+  score.hpp          score scale and mate range
+  tt.hpp             transposition table     tt.cpp
+  eval.hpp           evaluation              eval.cpp
+  search.hpp         search                  search.cpp
+tests/               doctest unit and property tests
+bench/bench.cpp      c4bench, bench/results/ holds recorded runs
+cli/cli.cpp          c4cli (analyze, play)
+```
+
+Everything engine-side is plain structs and free functions, except `Position` and
+`TranspositionTable`, which are classes because each guards an invariant (the board's bitboards
+and hash must stay consistent; the table's index mask needs a power-of-two size).
+
+## Board representation
+
+The board is two 64-bit bitboards: `current` (stones of the side to move) and `mask` (all
+stones). Each column uses 7 bits: 6 cells plus an empty sentinel bit on top, so bit
+`col * 7 + row` is cell (col, row).
+
+- **Win detection** is four shift-and-AND steps, one per direction (1 = vertical, 7 = horizontal,
+  6 and 8 = diagonals). The sentinel bit is never set, so a shift that walks off the top of a
+  column reads a 0 instead of wrapping into the next column.
+- **Playing a move** is `mask + bottom_of_column`, masked to the column: the carry lands on the
+  lowest empty cell. Switching sides is `current ^= mask` before adding the stone.
+- **Copy-make.** `Position` is 32 bytes and trivially copyable, so the search copies it for each
+  child instead of undoing moves. There is no undo code to get wrong.
+
+## Zobrist hashing vs a perfect key
+
+A Connect-4 position fits exactly in one 64-bit number: `current + mask` is unique per position
+(the sum marks each column's height with one extra bit), so it could key the transposition table
+with zero collisions.
+The engine still uses Zobrist hashing:
+
+- **Its bits are evenly mixed.** The perfect key is cheap to compute too, but its bits are board
+  cells: the low 20 bits describe only columns 1 to 3, so indexing a 2^20 table by them would put
+  every position that agrees on those columns in the same slot. Zobrist bits are uniformly
+  random, so `hash & (size - 1)` spreads positions evenly. It is also incremental: `play()` XORs
+  one precomputed key into the hash.
+- **It is the standard technique** in game engines (chess, go, shogi) and the one this project
+  sets out to demonstrate.
+- **Collisions are negligible.** Two different positions share a 64-bit hash with probability
+  about 2^-64 per pair. By the birthday bound, collisions become likely only after about 2^32
+  (4 billion) positions are stored together, far beyond a 2^20-entry table. The TT stores the
+  full hash and compares it on every probe, so slot sharing (which is constant) never returns
+  another position's data.
+
+The keys are 2 x 49 numbers from a fixed-seed splitmix64 generator, built at compile time: one
+key per player per bit index. There is no side-to-move key, because in Connect-4 the side to
+move follows from the number of stones, which the hash already encodes. An earlier version also
+exposed the perfect key as `Position::key()` for a collision-checking debug build; nothing else
+used it, so the simplification audit removed both.
+
+## Transposition table
+
+2^20 entries of 16 bytes (16 MiB), always-replace, indexed by the hash's low bits.
+
+| Field | Type | Contents |
+|---|---|---|
+| key | uint64 | full Zobrist hash, to verify the slot holds this position |
+| score | int16 | score, with mate scores stored node-relative (below) |
+| depth | uint8 | remaining depth the score was searched to |
+| flag | uint8 | NONE (empty), EXACT, LOWER, UPPER |
+| bestMove | uint8 | column, or 255 for none |
+
+Four entries fill one 64-byte cache line, so a probe touches one line.
+
+- **Bound flags.** With alpha-beta, a node's score is exact only if it lands inside the
+  (alpha, beta) window. A fail-high stores a LOWER bound, a fail-low an UPPER bound. A probe may
+  replace the search only if the stored depth is at least the needed depth and the flag proves
+  the result for the current window (`usableScore` in `tt.cpp`).
+- **NONE flag.** The empty board hashes to 0, the same as a zeroed slot's key. The NONE flag is
+  what keeps an empty slot from looking like data for the empty board.
+- **Mate scores.** A win on ply p from the search root scores `10000 - p`. Stored as is, that
+  distance would be wrong when the same position is reached at another ply, in this search or
+  the next. So `store` adds the node's ply (making the score "win in k plies from this node")
+  and `probe` subtracts the probing node's ply.
+- **Always-replace** is the simplest policy. Its cost shows in the PV (below); depth-preferred
+  replacement is the obvious next step if that matters.
+
+## Search
+
+`search()` runs iterative deepening over a negamax function. Each node, in order:
+
+1. Count the node; every 4096 nodes (after the first iteration), check the time limit.
+2. If the side to move has a winning move, return `10000 - (ply + 1)`. Checking this first means
+   no child is ever a finished game, and a win is seen one ply past the depth limit.
+3. If the board is full, return 0 (draw). At depth 0, return the evaluation.
+4. Probe the TT. Below the root, return the stored score if it is usable; remember the stored
+   best move either way.
+5. Search the children in order: the TT move first, then center-out (4, 3, 5, 2, 6, 1, 7). Center
+   columns belong to more four-in-a-row lines, so they are more often best.
+6. Store the result with its bound flag.
+
+**Alpha-beta is fail-soft**: a node returns its best child score even outside the window, which
+gives tighter TT bounds. The root never takes a TT cutoff, so it always reports a searched move.
+
+**Iterative deepening** searches depth 1, 2, 3, ... Each iteration leaves best moves in the TT
+that order the next one, and a finished iteration is always available when time runs out. The
+first iteration always completes, so there is always a move. A proven win or loss stops the
+deepening, since more depth cannot change it.
+
+**PV** comes from following TT best moves from the root, checking each for legality, and ends
+with the winning move when the line is a proven win.
+
+**Toggles.** `SearchOptions` has `useAlphaBeta`, `useTT`, `useMoveOrdering` and
+`useIterativeDeepening`, so the benchmark can turn each technique off and the tests can prove
+none of them changes the result. With alpha-beta off the window stays (-inf, +inf), which is
+plain minimax. Move ordering off means columns 1 to 7 in order and no TT move.
+
+**Stats**: nodes, TT probes and hits (differences of the TT's own counters), beta cutoffs, and
+cutoffs by the first move tried. The share of first-move cutoffs measures ordering quality.
+
+## Evaluation
+
+At depth 0 the score is a weighted count over the 69 four-cell windows of the board, plus a
+center-column term. All weights are in one struct, `EvalWeights`:
+
+| Weight | Default | Counts |
+|---|---|---|
+| threeOpen | 5 | windows with 3 of a player's stones and 1 empty cell |
+| twoOpen | 2 | windows with 2 stones and 2 empty cells |
+| centerStone | 3 | stones in the center column |
+
+Each weight applies to both players with opposite signs, so the score of a position for one side
+is exactly the negation of its score for the other, which negamax relies on. A test computes the
+largest possible score from the weights (363 with the defaults) and checks it stays below the
+mate range (9958 and up), so no heuristic score can be mistaken for a proven result. The weights
+are a common starting point and are not tuned; the evaluation also ignores which threats can
+actually be completed first (odd/even threat parity), which matters a lot in Connect-4.
+
+## Testing
+
+- **Minimax equivalence.** 60 seeded random positions, depths 1 to 6, all 16 combinations of the
+  four toggles, TT cleared before every search. Each must return the plain-minimax score, and the
+  reported move must be one whose minimax score equals it.
+- **Mutation testing** checked that the equivalence test catches real bugs. Storing a fail-low as
+  EXACT, accepting a LOWER bound at alpha instead of beta, ignoring the stored depth, and storing
+  alpha instead of the best score all fail it. At depth 5 the first of these passed, which is why
+  the test goes to depth 6.
+- **Mate distance through a reused TT.** Mate distance bugs (wrong ply on store or probe) pass the
+  equivalence test, because a cleared TT at depth 6 almost never reuses a mate entry at another
+  ply. A second test searches a proven position, plays the best move, and searches again with the
+  same TT, as a game would: the result must be exactly one ply closer. It catches all three mate
+  distance mutations tried.
+- **Property tests**: bitboard win detection against a naive checker on 20,000 boards,
+  incremental hash against a from-scratch hash over 200 games, evaluation antisymmetry and mirror
+  symmetry on random positions.
+- Plus unit tests for parsing, draws, TT flags and mate conversion, wins, blocks, iteration
+  bookkeeping and the time limit.
+
+## Benchmark method
+
+`c4bench` searches 100 seeded random positions of 4 to 16 plies, one search per position, with
+the TT cleared before each, so every row measures the same work from the same start. "Time per
+move" is the time of one such search. The seed and TT size are constants, so runs are comparable
+across machines. The ablation table turns off one technique at a time at one depth, and compares
+pure minimax with the full engine at a shallower depth where minimax finishes quickly.
+
+What the recorded results show (see the README for the numbers):
+
+- **Alpha-beta and move ordering matter most**: without alpha-beta the engine searches about 110
+  times more nodes at depth 10, without ordering about 13 times more.
+- **The TT saves about 3.6 times** the nodes at depth 10, and is what makes the ordering work
+  across iterations.
+- **Iterative deepening costs nodes at a fixed depth** (about 13% more at depth 10). It pays for
+  itself in time control, not in fixed-depth node counts.
+- **First-move cutoff rate is about 80%** with ordering on, so most cutoffs come from the first
+  move tried. That leaves limited room for killer moves (see below).
+
+## What was left out, and known limitations
+
+- **Killer moves, JSON benchmark output, `--seed` and `--tt-size` flags, a collision-checking
+  build**: cut in the simplification audit as unused or unmeasured. Killers can come back if the
+  benchmark shows the first-move cutoff rate leaves enough room.
+- **The PV can be short** on deep searches: always-replace overwrites the root line's entries
+  while sibling subtrees are searched (complete at depth 14, a few moves at 17 and beyond). The
+  best move and score are unaffected.
+- **Scores alternate between odd and even depths**, because the evaluation favors whoever moved
+  last at the horizon.
+- **The time limit applies only with iterative deepening on**, since it is checked from the second
+  iteration onward, and it can overshoot by up to 4096 nodes (well under a millisecond).
