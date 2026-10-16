@@ -74,7 +74,8 @@ struct Searcher {
 
         std::array<int, WIDTH> order{};
         int count = 0;
-        const int first = opt.useMoveOrdering ? ttMove : -1;
+        // A true 64-bit hash collision could hand back another position's move, so check it.
+        const int first = opt.useMoveOrdering && ttMove >= 0 && pos.canPlay(ttMove) ? ttMove : -1;
         if (first >= 0) order[count++] = first;
         for (int col : opt.useMoveOrdering ? CENTER_OUT : LEFT_TO_RIGHT) {
             if (col != first && pos.canPlay(col)) order[count++] = col;
