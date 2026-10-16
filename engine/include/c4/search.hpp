@@ -21,6 +21,7 @@ struct SearchOptions {
 
 struct SearchStats {
     std::uint64_t nodes = 0;
+    std::uint64_t ttProbes = 0;
     std::uint64_t ttHits = 0;
     std::uint64_t betaCutoffs = 0;
     // Cutoffs caused by the first move tried. Its share of betaCutoffs says how good the move

@@ -135,7 +135,7 @@ std::vector<int> principalVariation(Position pos, TranspositionTable& tt, int be
 
 SearchResult search(const Position& pos, TranspositionTable& tt, const SearchOptions& opt) {
     Searcher s{tt, opt, Clock::now()};
-    const std::uint64_t hitsBefore = tt.stats().hits;
+    const TTStats ttBefore = tt.stats();
     SearchResult result;
 
     // Searching past the end of the game would only repeat the last depth.
@@ -159,7 +159,9 @@ SearchResult search(const Position& pos, TranspositionTable& tt, const SearchOpt
     }
 
     result.stats = s.stats;
-    result.stats.ttHits = tt.stats().hits - hitsBefore;
+    // Differences of the TT's own counters, read before the PV walk probes the table again.
+    result.stats.ttProbes = tt.stats().probes - ttBefore.probes;
+    result.stats.ttHits = tt.stats().hits - ttBefore.hits;
     result.timeMs = s.elapsedMs();
     result.pv = opt.useTT ? principalVariation(pos, tt, result.bestMove, result.depthReached)
                           : std::vector<int>{result.bestMove};

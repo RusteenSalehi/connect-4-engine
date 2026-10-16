@@ -162,8 +162,10 @@ TEST_CASE("each technique cuts nodes, and the counters agree with the toggles") 
     CHECK(everything.stats.nodes < alphaBetaOnly.stats.nodes);
 
     CHECK(minimaxOnly.stats.betaCutoffs == 0);
+    CHECK(alphaBetaOnly.stats.ttProbes == 0);
     CHECK(alphaBetaOnly.stats.ttHits == 0);
     CHECK(everything.stats.ttHits > 0);
+    CHECK(everything.stats.ttHits <= everything.stats.ttProbes);
     CHECK(everything.stats.betaCutoffs > 0);
     CHECK(everything.stats.firstMoveCutoffs <= everything.stats.betaCutoffs);
 }
