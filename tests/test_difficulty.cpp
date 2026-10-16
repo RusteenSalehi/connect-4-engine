@@ -116,11 +116,15 @@ TEST_CASE("Easy plays plausibly but sometimes picks a non-best move") {
     CHECK(nonBestPicks > 0);
     CHECK(bestPicks > worstPicks);  // weighted toward better moves
 
-    // Plausible: a win in one is worth thousands of units more than anything else.
+    // Plausible: wins and losses in one are thousands of units away from any heuristic score, so
+    // Easy always takes a win in one and always blocks the opponent's.
     const Position winInOne = parse("121212");
+    const Position mustBlock = parse("11223");  // X threatens column 4 on the bottom row
     for (std::uint64_t seed = 0; seed < 50; ++seed) {
         tt.clear();
         CHECK(chooseMove(winInOne, Difficulty::Easy, seed, tt).move == 0);
+        tt.clear();
+        CHECK(chooseMove(mustBlock, Difficulty::Easy, seed, tt).move == 3);
     }
 }
 
