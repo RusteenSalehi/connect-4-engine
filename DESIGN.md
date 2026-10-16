@@ -12,7 +12,8 @@ engine/include/c4/   public headers        engine/src/   implementation
   score.hpp          score scale and mate range
   tt.hpp             transposition table     tt.cpp
   eval.hpp           evaluation              eval.cpp
-  search.hpp         search                  search.cpp
+  search.hpp         search, rootScores      search.cpp
+  difficulty.hpp     difficulty levels       difficulty.cpp
 tests/               doctest unit and property tests
 bench/bench.cpp      c4bench, bench/results/ holds recorded runs
 cli/cli.cpp          c4cli (analyze, play)
@@ -123,6 +124,37 @@ plain minimax. Move ordering off means columns 1 to 7 in order and no TT move.
 **Stats**: nodes, TT probes and hits (differences of the TT's own counters), beta cutoffs, and
 cutoffs by the first move tried. The share of first-move cutoffs measures ordering quality.
 
+## Difficulty levels
+
+`chooseMove(pos, difficulty, seed, tt)` picks a move at one of four levels, so the logic lives in
+the engine, in one tested place, rather than in each user interface. Every number is a named
+constant in `difficulty.hpp`.
+
+**Exact root scores.** Alpha-beta proves only that a losing move is "no better than the best", so
+`search()` cannot tell a tie from a blunder. `rootScores(pos, depth, tt)` searches each legal
+root move with a full window (sharing the TT), which makes every move's score exact. All levels
+choose from these scores. A test checks them against plain minimax, and another checks that
+their maximum equals `search()`'s score.
+
+| Level | Depth (plies) | Choice among root scores |
+|---|---|---|
+| Easy | 1 | Softmax: weight exp((score - best) / 4). A move 4 points worse is picked 0.37 times as often as the best. Wins and losses in one are thousands of points away, so Easy always takes a win in one and avoids a loss in one. |
+| Medium | 3 to 5, uniform per move | Uniform among moves at most 3 points below the best (one center stone with the default weights). |
+| Hard | 7 | Uniform among the best moves (Medium's rule with a margin of 0). |
+| Impossible | 10, then deeper | Deepens one ply at a time like `search()`. Up to depth 10 nothing stops it; after that it stops when a 1000 ms budget runs out (the unfinished depth is discarded) or the result is a proven win or loss. Best move, ties to the most central column. |
+
+**Randomness** comes only from a splitmix64 generator seeded by the caller, so the same position,
+level, seed and TT contents always give the same move. Impossible also depends on how deep it
+gets in its time. The CLI seeds each game from the clock and adds the move number per move; the
+bench and tests use fixed seeds.
+
+**Depth caps.** A level never searches deeper than the number of empty cells, since there is
+nothing left to search. Impossible can therefore end below its 1 second budget by searching
+to the end of the game; in the benchmark that happened in 2 of 100 positions (a proven draw).
+
+**Not clearing the TT.** Like `search()`, `chooseMove` leaves the TT to the caller: the CLI keeps
+one per game, tests and the bench clear it before each move.
+
 ## Evaluation
 
 At depth 0 the score is a weighted count over the 69 four-cell windows of the board, plus a
@@ -207,6 +239,11 @@ What this does and does not show:
   ply. A second test searches a proven position, plays the best move, and searches again with the
   same TT, as a game would: the result must be exactly one ply closer. It catches all three mate
   distance mutations tried.
+- **Difficulty levels**: the same seed gives the same move (Easy, Medium, Hard); Hard always plays
+  a move with the best score at depth 7 and breaks real ties differently across seeds; Impossible
+  reaches depth 10 or more (also from a position already proven at depth 2) and plays the most
+  central best move; Easy picks non-best moves but favors better ones, and always takes a win in
+  one and blocks the opponent's; Medium stays in its depth range and margin.
 - **Property tests**: bitboard win detection against a naive checker on 20,000 boards,
   incremental hash against a from-scratch hash over 200 games, evaluation antisymmetry and mirror
   symmetry on random positions.
@@ -229,6 +266,9 @@ What the recorded results show (see the README for the numbers):
   across iterations.
 - **Iterative deepening costs nodes at a fixed depth** (about 13% more at depth 10). It pays for
   itself in time control, not in fixed-depth node counts.
+- **Difficulty levels cost very different amounts**: Easy, Medium and Hard all take under 3 ms per
+  move even in the worst case; Impossible averages about half a second, because about half of the
+  positions end early with a proven win or loss (searched to depth 16 on average).
 - **First-move cutoff rate is about 80%** with ordering on, so most cutoffs come from the first
   move tried. That leaves limited room for killer moves (see below).
 
