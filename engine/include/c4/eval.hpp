@@ -7,7 +7,9 @@
 
 namespace c4 {
 
-// Every evaluation weight in one place, so a later phase can tune them without touching code.
+// Every evaluation weight in one place, so c4tune can tune them without touching code. Tuning
+// (hill climbing, step 1, depth-4 matches, accept above 55%) found no change that beats these
+// values, so they are unchanged; see DESIGN.md.
 // Each weight applies to both players with opposite signs (own counts add, opponent counts
 // subtract). Using one weight per feature keeps evalFor antisymmetric, which negamax relies on:
 // the score of a position for one player is exactly the negation of the score for the other.

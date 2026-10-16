@@ -16,6 +16,7 @@ engine/include/c4/   public headers        engine/src/   implementation
 tests/               doctest unit and property tests
 bench/bench.cpp      c4bench, bench/results/ holds recorded runs
 cli/cli.cpp          c4cli (analyze, play)
+tune/tune.cpp        c4tune (evaluation tuning by engine-vs-engine matches)
 ```
 
 Everything engine-side is plain structs and free functions, except `Position` and
@@ -136,9 +137,61 @@ center-column term. All weights are in one struct, `EvalWeights`:
 Each weight applies to both players with opposite signs, so the score of a position for one side
 is exactly the negation of its score for the other, which negamax relies on. A test computes the
 largest possible score from the weights (363 with the defaults) and checks it stays below the
-mate range (9958 and up), so no heuristic score can be mistaken for a proven result. The weights
-are a common starting point and are not tuned; the evaluation also ignores which threats can
-actually be completed first (odd/even threat parity), which matters a lot in Connect-4.
+mate range (9958 and up), so no heuristic score can be mistaken for a proven result. The
+defaults started as a common textbook choice; the tuning below tested them and found no
+improvement. The evaluation also ignores which threats can actually be completed first
+(odd/even threat parity), which matters a lot in Connect-4.
+
+## Evaluation tuning
+
+`c4tune` tunes the weights by playing the engine against itself.
+
+**Match.** Two weight sets play all 49 two-ply openings (every first move times every reply),
+each opening twice with colors swapped, at a fixed search depth (4 for tuning). Win 1, draw 0.5,
+loss 0, out of 98. Each move is a fresh search with an empty TT, so the two players never read
+each other's scores. The engine has no randomness, so a match between the same two weight sets
+always gives the same result, on any machine. A match of the defaults against themselves must
+score exactly 50%, and the tool checks this first.
+
+**Hill climbing.** Each round changes one weight by +1 or -1 (cycling threeOpen, twoOpen,
+centerStone, plus then minus), plays the candidate against the current best, and accepts it only
+if it scores above 55% (54 of 98 points). The margin keeps a candidate from being accepted
+because it happens to suit a few openings. 60 rounds.
+
+**Validation.** The final weights play the original defaults at the tuning depth and again at
+depth 6, which the tuner never used, to check that a gain is not tied to depth 4.
+
+**Result: no improvement.** No candidate reached 55%, so the defaults are unchanged.
+
+| Candidate (vs defaults, depth 4) | W / D / L | Score |
+|---|---|---|
+| threeOpen +1 (6) | 38 / 15 / 45 | 46.4% |
+| threeOpen -1 (4) | 39 / 13 / 46 | 46.4% |
+| twoOpen +1 (3) | 41 / 11 / 46 | 47.4% |
+| twoOpen -1 (1) | 37 / 11 / 50 | 43.4% |
+| centerStone +1 (4) | 46 / 11 / 41 | 52.6% |
+| centerStone -1 (2) | 34 / 18 / 46 | 43.9% |
+
+| Final vs original | W / D / L | Score |
+|---|---|---|
+| At the tuning depth (4) | 41 / 16 / 41 | 50.0% |
+| At the validation depth (6) | 42 / 14 / 42 | 50.0% |
+
+Since no change was accepted, the final weights are the defaults, and both "final vs original"
+matches are the defaults playing themselves: exactly 50%, as the color swap guarantees.
+
+What this does and does not show:
+
+- Five of the six neighbours lose clearly to the defaults (43 to 47%), and the sixth
+  (centerStone 4) wins only 52.6%. Under this criterion the defaults are a local optimum.
+- Because the matches are deterministic and the candidates repeat in a fixed cycle, once one
+  full pass of six is rejected, every later round replays a match already played. In practice
+  this run measured six distinct candidates; rounds 7 to 60 repeat them.
+- It does not show the defaults are globally best. Hill climbing with step 1 only looks at
+  immediate neighbours, and 98 games from one fixed opening set is a small sample. A larger step,
+  a larger opening set (for example the 343 three-ply openings), or tuning new features such as
+  threat parity could still find something. I have not run those, because choosing settings
+  until something passes would make the result meaningless.
 
 ## Testing
 
