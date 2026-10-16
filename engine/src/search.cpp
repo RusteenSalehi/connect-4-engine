@@ -117,7 +117,8 @@ struct Searcher {
 };
 
 // Follows TT best moves from the root. Entries can have been overwritten, so every move is
-// checked for legality and the line can come out shorter than the search depth.
+// checked for legality and the line can come out shorter than the search depth. A winning move
+// at the end can make it one move longer.
 std::vector<int> principalVariation(Position pos, TranspositionTable& tt, int bestMove,
                                     int depth) {
     std::vector<int> pv{bestMove};
@@ -127,6 +128,14 @@ std::vector<int> principalVariation(Position pos, TranspositionTable& tt, int be
         if (!hit || hit->bestMove < 0 || !pos.canPlay(hit->bestMove)) break;
         pv.push_back(hit->bestMove);
         pos.play(hit->bestMove);
+    }
+    // The search sees the final move of a won line through its win check, which stores nothing in
+    // the TT, so add that move here. Then a proven line ends with the win.
+    for (int col = 0; col < WIDTH && !pos.lastMoverWon(); ++col) {
+        if (pos.canPlay(col) && pos.isWinningMove(col)) {
+            pv.push_back(col);
+            break;
+        }
     }
     return pv;
 }

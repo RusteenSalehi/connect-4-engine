@@ -137,13 +137,20 @@ TEST_CASE("win and loss scores carry the distance, and deepening stops once prov
     CHECK(win.score == WIN_SCORE - 3);
     // Depth 2 already proves it: the win check at the leaf sees the winning move on ply 3.
     CHECK(win.depthReached == 2);
+    // The PV ends with the win: move 4, any reply, then the winning move.
+    REQUIRE(win.pv.size() == 3);
     CHECK(win.pv.front() == 3);
+    Position afterPv = parse("2737");
+    CHECK(isLegalLine(afterPv, win.pv));
+    for (int col : win.pv) afterPv.play(col);
+    CHECK(afterPv.lastMoverWon());
 
     // The same position one move later, from the loser's side: lost on ply 2.
     tt.clear();
     SearchResult loss = search(parse("27374"), tt, opt);
     CHECK(loss.score == -(WIN_SCORE - 2));
     CHECK(loss.depthReached < opt.maxDepth);
+    CHECK(loss.pv.size() == 2);  // a defence, then the opponent's winning move
 }
 
 TEST_CASE("each technique cuts nodes, and the counters agree with the toggles") {
@@ -185,7 +192,7 @@ TEST_CASE("iterative deepening reports every iteration and a legal principal var
     CHECK(r.iterations.back().nodes == r.stats.nodes);
     REQUIRE_FALSE(r.pv.empty());
     CHECK(r.pv.front() == r.bestMove);
-    CHECK(static_cast<int>(r.pv.size()) <= r.depthReached);
+    CHECK(static_cast<int>(r.pv.size()) <= r.depthReached + 1);  // + 1 for a final winning move
     CHECK(isLegalLine(Position{}, r.pv));
 }
 
