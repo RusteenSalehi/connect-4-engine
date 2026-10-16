@@ -109,6 +109,50 @@ TEST_CASE("after the best move, a proven result is one ply closer, through a reu
     CHECK(checked >= 10);  // guard: the sample must really contain proven results
 }
 
+TEST_CASE("rootScores gives every legal root move its exact minimax score") {
+    TranspositionTable tt(16);
+    for (const Position& pos : randomPositions(20, 23)) {
+        for (int depth = 1; depth <= 4; ++depth) {
+            tt.clear();
+            const RootScores r = rootScores(pos, depth, tt);
+            REQUIRE(r.complete);
+            for (int col = 0; col < WIDTH; ++col) {
+                CAPTURE(col);
+                if (!pos.canPlay(col)) {
+                    CHECK(r.scores[col] == -INF_SCORE);
+                    continue;
+                }
+                Position child = pos;
+                child.play(col);
+                const int expected =
+                    pos.isWinningMove(col) ? WIN_SCORE - 1 : -minimax(child, depth - 1, 1);
+                CHECK(r.scores[col] == expected);
+            }
+        }
+    }
+}
+
+TEST_CASE("the best of rootScores equals the search score at the same depth") {
+    TranspositionTable tt(16);
+    for (const Position& pos : randomPositions(30, 24)) {
+        for (int depth = 1; depth <= 8; ++depth) {
+            CAPTURE(depth);
+            tt.clear();
+            const RootScores r = rootScores(pos, depth, tt);
+            tt.clear();
+            SearchOptions opt;
+            opt.maxDepth = depth;
+            CHECK(*std::max_element(r.scores.begin(), r.scores.end()) ==
+                  search(pos, tt, opt).score);
+        }
+    }
+}
+
+TEST_CASE("a time limit stops rootScores and marks it incomplete") {
+    TranspositionTable tt(20);
+    CHECK_FALSE(rootScores(Position{}, 30, tt, 20).complete);
+}
+
 TEST_CASE("an immediate win is played and scored as a win in one") {
     TranspositionTable tt(16);
     const SearchResult r = search(parse("121212"), tt);

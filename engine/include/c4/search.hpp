@@ -1,10 +1,12 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
 #include "c4/eval.hpp"
 #include "c4/position.hpp"
+#include "c4/score.hpp"
 #include "c4/tt.hpp"
 
 namespace c4 {
@@ -57,5 +59,19 @@ struct SearchResult {
 // carries over between searches; clear it first for a reproducible search.
 // Precondition: the game is not over.
 SearchResult search(const Position& pos, TranspositionTable& tt, const SearchOptions& opt = {});
+
+struct RootScores {
+    // Exact score of each legal column, from the side to move's point of view; -INF_SCORE for a
+    // full column.
+    std::array<int, WIDTH> scores{};
+    SearchStats stats;
+    bool complete = true;  // false if the time limit stopped it; the scores are then unusable
+};
+
+// Searches every legal root move with a full window, so each score is exact, not just "no better
+// than the best" as alpha-beta proves for the losing moves. The difficulty levels need this to
+// see ties and near ties. Uses (and fills) the TT like search(). A timeLimitMs above 0 can stop
+// it early (complete = false). Precondition: the game is not over and depth >= 1.
+RootScores rootScores(const Position& pos, int depth, TranspositionTable& tt, int timeLimitMs = 0);
 
 }  // namespace c4

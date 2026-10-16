@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -19,6 +20,11 @@ inline constexpr int HEIGHT = 6;
 // next column. That is what makes shift-and-AND win detection safe.
 inline constexpr int COLUMN_BITS = HEIGHT + 1;
 inline constexpr int MAX_MOVES = WIDTH * HEIGHT;  // 42
+
+// Columns from the center outward. Center columns belong to more four-in-a-row windows, so they
+// are more often the best move: the search tries them first and Impossible breaks ties toward
+// them.
+inline constexpr std::array<int, WIDTH> CENTER_OUT = {3, 2, 4, 1, 5, 0, 6};
 
 // zobrist.hpp cannot include this header (this header includes it), so it states the board size
 // on its own. This check keeps the two in sync.

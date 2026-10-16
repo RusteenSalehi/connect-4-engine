@@ -12,8 +12,6 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 
-// Center columns belong to more four-in-a-row windows, so they are more often the best move.
-constexpr std::array<int, WIDTH> CENTER_OUT = {3, 2, 4, 1, 5, 0, 6};
 constexpr std::array<int, WIDTH> LEFT_TO_RIGHT = {0, 1, 2, 3, 4, 5, 6};
 
 // Reading the clock on every node would cost more than the node itself.
@@ -173,6 +171,35 @@ SearchResult search(const Position& pos, TranspositionTable& tt, const SearchOpt
     result.timeMs = s.elapsedMs();
     result.pv = opt.useTT ? principalVariation(pos, tt, result.bestMove, result.depthReached)
                           : std::vector<int>{result.bestMove};
+    return result;
+}
+
+RootScores rootScores(const Position& pos, int depth, TranspositionTable& tt, int timeLimitMs) {
+    SearchOptions opt;
+    opt.timeLimitMs = timeLimitMs;
+    Searcher s{tt, opt, Clock::now()};
+    s.timeChecks = true;  // unlike search(), there is no earlier result to fall back on here
+    const TTStats ttBefore = tt.stats();
+    RootScores result;
+    result.scores.fill(-INF_SCORE);
+    for (int col : CENTER_OUT) {
+        if (!pos.canPlay(col)) continue;
+        if (pos.isWinningMove(col)) {
+            result.scores[col] = WIN_SCORE - 1;
+            continue;
+        }
+        Position child = pos;
+        child.play(col);
+        // The child is at ply 1, so its mate scores come out root-relative, as in search().
+        result.scores[col] = -s.negamax(child, depth - 1, 1, -INF_SCORE, INF_SCORE);
+        if (s.stopped) {
+            result.complete = false;
+            break;
+        }
+    }
+    result.stats = s.stats;
+    result.stats.ttProbes = tt.stats().probes - ttBefore.probes;
+    result.stats.ttHits = tt.stats().hits - ttBefore.hits;
     return result;
 }
 
