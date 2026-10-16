@@ -1,16 +1,21 @@
 // c4cli: analyze a position or play a game against the engine in the terminal.
 //
 //   c4cli analyze [--moves 4453] [--depth N] [--time MS]
-//   c4cli play [--engine-first] [--time MS]
+//   c4cli play [--engine-first] [--difficulty easy|medium|hard|impossible]
 //
-// Moves are digits 1 to 7, one per ply, first player (X) first. Without --depth or --time the
-// engine thinks for 1 second.
+// Moves are digits 1 to 7, one per ply, first player (X) first. Without --depth or --time,
+// analyze thinks for 1 second. play defaults to impossible.
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <string_view>
 
+#include "c4/difficulty.hpp"
 #include "c4/position.hpp"
 #include "c4/score.hpp"
 #include "c4/search.hpp"
@@ -21,6 +26,8 @@ using namespace c4;
 namespace {
 
 constexpr int DEFAULT_TIME_MS = 1000;
+// In the order of the Difficulty enum.
+constexpr std::string_view DIFFICULTY_NAMES[] = {"easy", "medium", "hard", "impossible"};
 
 struct Args {
     std::string command;
@@ -28,34 +35,41 @@ struct Args {
     int depth = 0;   // 0 means no depth limit
     int timeMs = 0;  // 0 means no time limit
     bool engineFirst = false;
+    Difficulty difficulty = Difficulty::Impossible;
 };
 
 void printUsage() {
     std::fprintf(stderr,
                  "usage: c4cli analyze [--moves 4453] [--depth N] [--time MS]\n"
-                 "       c4cli play [--engine-first] [--time MS]\n");
+                 "       c4cli play [--engine-first] [--difficulty easy|medium|hard|impossible]\n");
 }
 
 bool parseArgs(int argc, char** argv, Args& args) {
     if (argc < 2) return false;
     args.command = argv[1];
     if (args.command != "analyze" && args.command != "play") return false;
+    const bool analyzing = args.command == "analyze";
     for (int i = 2; i < argc; ++i) {
         const std::string_view flag = argv[i];
-        if (flag == "--engine-first" && args.command == "play") {
+        if (flag == "--engine-first" && !analyzing) {
             args.engineFirst = true;
             continue;
         }
         if (i + 1 >= argc) return false;
         const char* value = argv[++i];
-        if (flag == "--moves" && args.command == "analyze") {
+        if (flag == "--moves" && analyzing) {
             args.moves = value;
-        } else if (flag == "--depth" && args.command == "analyze") {
+        } else if (flag == "--depth" && analyzing) {
             args.depth = std::atoi(value);
             if (args.depth < 1 || args.depth > MAX_MOVES) return false;
-        } else if (flag == "--time") {
+        } else if (flag == "--time" && analyzing) {
             args.timeMs = std::atoi(value);
             if (args.timeMs < 1) return false;
+        } else if (flag == "--difficulty" && !analyzing) {
+            const auto name = std::find(std::begin(DIFFICULTY_NAMES), std::end(DIFFICULTY_NAMES),
+                                        std::string_view(value));
+            if (name == std::end(DIFFICULTY_NAMES)) return false;
+            args.difficulty = static_cast<Difficulty>(name - std::begin(DIFFICULTY_NAMES));
         } else {
             return false;
         }
@@ -121,8 +135,13 @@ int play(const Args& args) {
     Position pos;
     // The TT is kept for the whole game, so each search starts with what the last one learned.
     TranspositionTable tt;
+    // A new seed per game, so games against the random levels differ; adding the move number
+    // gives every move its own seed.
+    const auto gameSeed =
+        static_cast<std::uint64_t>(std::chrono::steady_clock::now().time_since_epoch().count());
     const char human = args.engineFirst ? 'O' : 'X';
-    std::printf("You are %c. Enter a column 1 to 7, or q to quit.\n\n", human);
+    std::printf("You are %c, the engine plays %s. Enter a column 1 to 7, or q to quit.\n\n",
+                human, DIFFICULTY_NAMES[static_cast<int>(args.difficulty)].data());
 
     while (!gameOver(pos)) {
         std::printf("%s\n", pos.toAscii().c_str());
@@ -137,10 +156,10 @@ int play(const Args& args) {
             }
             pos.play(col);
         } else {
-            const SearchResult r = search(pos, tt, searchOptions(args));
-            std::printf("Engine plays %d. Depth %d, score %s.\n\n", r.bestMove + 1, r.depthReached,
-                        describeScore(r.score).c_str());
-            pos.play(r.bestMove);
+            const MoveChoice c = chooseMove(pos, args.difficulty, gameSeed + pos.moves(), tt);
+            std::printf("Engine plays %d. Depth %d, score %s.\n\n", c.move + 1, c.depth,
+                        describeScore(c.score).c_str());
+            pos.play(c.move);
         }
     }
 
