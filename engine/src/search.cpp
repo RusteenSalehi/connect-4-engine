@@ -4,7 +4,6 @@
 #include <array>
 #include <chrono>
 
-#include "c4/eval.hpp"
 #include "c4/score.hpp"
 
 namespace c4 {
@@ -57,7 +56,7 @@ struct Searcher {
             return 0;  // draw
         }
         if (depth == 0) {
-            return evaluate(pos);
+            return evaluate(pos, opt.weights);
         }
 
         const int alphaOrig = alpha;

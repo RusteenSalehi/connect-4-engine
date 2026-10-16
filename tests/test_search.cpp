@@ -196,6 +196,18 @@ TEST_CASE("iterative deepening reports every iteration and a legal principal var
     CHECK(isLegalLine(Position{}, r.pv));
 }
 
+TEST_CASE("the search evaluates leaves with the weights from its options") {
+    TranspositionTable tt(16);
+    SearchOptions opt;
+    opt.maxDepth = 1;
+    // Depth 1 from the empty board: the best move is the center, and its score is the leaf's
+    // evaluation negated (the leaf is scored for O, the root for X).
+    CHECK(search(Position{}, tt, opt).score == -evaluate(parse("4")));
+    opt.weights = EvalWeights{0, 0, 0};
+    tt.clear();
+    CHECK(search(Position{}, tt, opt).score == 0);
+}
+
 TEST_CASE("the TT carries knowledge from one search to the next") {
     TranspositionTable tt(20);
     SearchOptions opt;

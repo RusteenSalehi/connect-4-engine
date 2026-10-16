@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "c4/eval.hpp"
 #include "c4/position.hpp"
 #include "c4/tt.hpp"
 
@@ -17,6 +18,9 @@ struct SearchOptions {
     bool useTT = true;
     bool useMoveOrdering = true;  // TT move first, then center-out; off means columns 1 to 7
     bool useIterativeDeepening = true;
+    // Evaluation weights for the leaves. c4tune plays engines with different weights against
+    // each other; everything else uses the defaults.
+    EvalWeights weights;
 };
 
 struct SearchStats {
