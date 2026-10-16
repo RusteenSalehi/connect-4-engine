@@ -1,4 +1,5 @@
-// c4bench: measures the search on a fixed suite of random positions and prints Markdown tables.
+// c4bench: measures the search and the difficulty levels on a fixed suite of random positions
+// and prints Markdown tables.
 //
 //   c4bench [--depths 2,4,6] [--positions N] [--ablation-depth D]
 #include <algorithm>
@@ -10,6 +11,7 @@
 #include <string_view>
 #include <vector>
 
+#include "c4/difficulty.hpp"
 #include "c4/position.hpp"
 #include "c4/search.hpp"
 #include "c4/tt.hpp"
@@ -35,7 +37,17 @@ struct Summary {
     std::uint64_t betaCutoffs = 0;
     std::uint64_t firstMoveCutoffs = 0;
     std::vector<double> timesMs;  // one search per position: the time to choose a move
+    int depthSum = 0;             // difficulty table only: the depth each move was chosen at
 };
+
+void add(Summary& s, const SearchStats& stats, double timeMs) {
+    s.nodes += stats.nodes;
+    s.ttProbes += stats.ttProbes;
+    s.ttHits += stats.ttHits;
+    s.betaCutoffs += stats.betaCutoffs;
+    s.firstMoveCutoffs += stats.firstMoveCutoffs;
+    s.timesMs.push_back(timeMs);
+}
 
 // Searches every position with a cleared TT, so no position benefits from the one before.
 Summary run(const std::vector<Position>& positions, TranspositionTable& tt,
@@ -44,12 +56,20 @@ Summary run(const std::vector<Position>& positions, TranspositionTable& tt,
     for (const Position& pos : positions) {
         tt.clear();
         const SearchResult r = search(pos, tt, opt);
-        s.nodes += r.stats.nodes;
-        s.ttProbes += r.stats.ttProbes;
-        s.ttHits += r.stats.ttHits;
-        s.betaCutoffs += r.stats.betaCutoffs;
-        s.firstMoveCutoffs += r.stats.firstMoveCutoffs;
-        s.timesMs.push_back(r.timeMs);
+        add(s, r.stats, r.timeMs);
+    }
+    return s;
+}
+
+// The same for chooseMove. Position i uses seed SEED + i, so the random levels are reproducible.
+Summary runDifficulty(const std::vector<Position>& positions, TranspositionTable& tt,
+                      Difficulty difficulty) {
+    Summary s;
+    for (std::size_t i = 0; i < positions.size(); ++i) {
+        tt.clear();
+        const MoveChoice c = chooseMove(positions[i], difficulty, SEED + i, tt);
+        add(s, c.stats, c.timeMs);
+        s.depthSum += c.depth;
     }
     return s;
 }
@@ -153,6 +173,29 @@ void printAblationTable(const std::vector<Position>& positions, TranspositionTab
     std::printf("\n");
 }
 
+void printDifficultyTable(const std::vector<Position>& positions, TranspositionTable& tt) {
+    struct Level {
+        const char* name;
+        Difficulty difficulty;
+    };
+    const Level levels[] = {
+        {"Easy", Difficulty::Easy},
+        {"Medium", Difficulty::Medium},
+        {"Hard", Difficulty::Hard},
+        {"Impossible", Difficulty::Impossible},
+    };
+    std::printf("## Difficulty levels (chooseMove)\n\n");
+    std::printf("| Level | Mean depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s |\n");
+    std::printf("|---|---:|---:|---:|---:|---:|---:|\n");
+    for (const Level& level : levels) {
+        const Summary s = runDifficulty(positions, tt, level.difficulty);
+        std::printf("| %s | %.1f | %.0f | %.3f | %.3f | %.3f | %s |\n", level.name,
+                    static_cast<double>(s.depthSum) / positions.size(), meanNodes(s), meanMs(s),
+                    medianMs(s), maxMs(s), millionNodesPerSecond(s).c_str());
+    }
+    std::printf("\n");
+}
+
 // Parses "2,4,6" into depths; returns false on anything that is not a positive integer list.
 bool parseDepths(const char* text, std::vector<int>& depths) {
     depths.clear();
@@ -205,5 +248,6 @@ int main(int argc, char** argv) {
                 positionCount, MIN_PLIES, MAX_PLIES, TT_SIZE_LOG2);
     printDepthTable(positions, tt, depths);
     printAblationTable(positions, tt, ablationDepth);
+    printDifficultyTable(positions, tt);
     return 0;
 }
