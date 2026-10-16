@@ -30,7 +30,7 @@ int worstLegal(const Position& pos, const RootScores& r) {
 }  // namespace
 
 TEST_CASE("the same seed gives the same move") {
-    // Impossible is left out: how deep it gets depends on the clock, not only on the seed.
+    // Easy, Medium and Hard on random positions; Impossible below, where the clock cannot matter.
     TranspositionTable tt(16);
     for (Difficulty d : {Difficulty::Easy, Difficulty::Medium, Difficulty::Hard}) {
         for (const Position& pos : test::randomPositions(30, 31)) {
@@ -44,6 +44,18 @@ TEST_CASE("the same seed gives the same move") {
                 CHECK(pos.canPlay(a.move));
             }
         }
+    }
+
+    // Impossible depends on the clock only past depth 10. When the result is already proven,
+    // it stops at exactly depth 10 however fast the machine is, so its move is reproducible.
+    for (const Position& pos : {parse("121212"), parse("2737")}) {
+        tt.clear();
+        const MoveChoice a = chooseMove(pos, Difficulty::Impossible, 7, tt);
+        tt.clear();
+        const MoveChoice b = chooseMove(pos, Difficulty::Impossible, 7, tt);
+        CHECK(a.depth == IMPOSSIBLE_MIN_DEPTH);
+        CHECK(b.depth == IMPOSSIBLE_MIN_DEPTH);
+        CHECK(a.move == b.move);
     }
 }
 

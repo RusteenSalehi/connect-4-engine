@@ -239,7 +239,8 @@ What this does and does not show:
   ply. A second test searches a proven position, plays the best move, and searches again with the
   same TT, as a game would: the result must be exactly one ply closer. It catches all three mate
   distance mutations tried.
-- **Difficulty levels**: the same seed gives the same move (Easy, Medium, Hard); Hard always plays
+- **Difficulty levels**: the same seed gives the same move (Easy, Medium and Hard on random positions,
+  Impossible on proven positions, where it stops at depth 10 whatever the clock); Hard always plays
   a move with the best score at depth 7 and breaks real ties differently across seeds; Impossible
   reaches depth 10 or more (also from a position already proven at depth 2) and plays the most
   central best move; Easy picks non-best moves but favors better ones, and always takes a win in
