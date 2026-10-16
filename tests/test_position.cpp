@@ -165,6 +165,17 @@ TEST_CASE("ascii print shows absolute players") {
     CHECK(board.find(". . . X O . .\n1 2 3 4 5 6 7\n") != std::string::npos);
 }
 
+TEST_CASE("random positions are reproducible, in the ply range, and undecided") {
+    const auto a = randomPositions(200, 5, 20, 7);
+    CHECK(a == randomPositions(200, 5, 20, 7));  // same seed, same positions
+    CHECK(a != randomPositions(200, 5, 20, 8));
+    for (const Position& p : a) {
+        CHECK(p.moves() >= 5);
+        CHECK(p.moves() <= 20);
+        CHECK_FALSE(p.lastMoverWon());
+    }
+}
+
 TEST_CASE("mirror reflects left to right") {
     CHECK(parse("1234").mirror() == parse("7654"));
     CHECK(parse("4").mirror() == parse("4"));  // the center column maps to itself

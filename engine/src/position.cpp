@@ -66,6 +66,34 @@ Position Position::mirror() const {
     return m;
 }
 
+std::vector<Position> randomPositions(int count, int minPlies, int maxPlies, std::uint64_t seed) {
+    std::vector<Position> out;
+    SplitMix64 rng(seed);
+    while (static_cast<int>(out.size()) < count) {
+        Position p;
+        const int plies = minPlies + rng.below(maxPlies - minPlies + 1);
+        bool ok = true;
+        for (int i = 0; i < plies && ok; ++i) {
+            int col = rng.below(WIDTH);
+            // Skip full columns and winning moves, so every prefix stays non-terminal.
+            int tries = 0;
+            while ((!p.canPlay(col) || p.isWinningMove(col)) && tries < WIDTH) {
+                col = (col + 1) % WIDTH;
+                ++tries;
+            }
+            if (tries == WIDTH) {
+                ok = false;  // no safe move: discard this playout
+            } else {
+                p.play(col);
+            }
+        }
+        if (ok) {
+            out.push_back(p);
+        }
+    }
+    return out;
+}
+
 std::string Position::toAscii() const {
     Bitboard first = firstPlayerStones();
     std::string out;

@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "c4/zobrist.hpp"
 
@@ -100,5 +101,10 @@ private:
     int moves_ = 0;
     std::uint64_t hash_ = 0;  // the empty board hashes to 0 (XOR of no keys)
 };
+
+// `count` non-terminal positions from seeded random playouts of minPlies to maxPlies moves.
+// Winning moves are skipped so no position is already decided. Tests and the benchmark share it,
+// so a seed always names the same positions.
+std::vector<Position> randomPositions(int count, int minPlies, int maxPlies, std::uint64_t seed);
 
 }  // namespace c4
