@@ -21,7 +21,7 @@ struct Searcher {
     TranspositionTable& tt;
     const SearchOptions& opt;
     Clock::time_point start;
-    SearchStats stats;
+    SearchStats stats{};
     bool timeChecks = false;  // off during the first iteration, so there is always a move
     bool stopped = false;
     int rootBestMove = -1;
