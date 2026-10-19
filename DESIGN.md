@@ -267,9 +267,9 @@ What the recorded results show (see the README for the numbers):
   across iterations.
 - **Iterative deepening costs nodes at a fixed depth** (about 13% more at depth 10). It pays for
   itself in time control, not in fixed-depth node counts.
-- **Difficulty levels cost very different amounts**: Easy, Medium and Hard all take under 3 ms per
+- **Difficulty levels cost very different amounts**: Easy, Medium and Hard all take under 5 ms per
   move even in the worst case; Impossible averages about half a second, because about half of the
-  positions end early with a proven win or loss (searched to depth 16 on average).
+  positions end early with a proven win or loss (searched to depth 15 to 16 on average).
 - **First-move cutoff rate is about 80%** with ordering on, so most cutoffs come from the first
   move tried. That leaves limited room for killer moves (see below).
 

@@ -145,15 +145,18 @@ c4bench [--depths 2,4,6,8,10,12,14,16] [--positions 100] [--ablation-depth 10]
 ```
 
 The defaults are shown. The seed and TT size are fixed constants, so runs are comparable. Besides
-the search tables, the bench runs every difficulty level on the same positions (about a minute,
+the search tables, the bench runs every difficulty level on the same positions (about two minutes,
 mostly Impossible's 1 second budget).
 Recorded runs live in [bench/results](bench/results).
 
-### Results: Windows 11 ARM64 laptop, Release build (MSVC 19.44)
+### Results: WSL2 Ubuntu, gcc, Snapdragon ARM64, Release
 
-Verbatim output of `build/release/c4bench` with default flags, from
-[bench/results/windows11-arm64-release.md](bench/results/windows11-arm64-release.md). Only its
-title line is replaced by the heading above.
+Verbatim output of `build/linux-release/c4bench` with default flags (gcc 15.2, WSL2 Ubuntu 26.04
+on a Snapdragon X laptop), from
+[bench/results/wsl2-ubuntu-gcc-arm64-release.md](bench/results/wsl2-ubuntu-gcc-arm64-release.md).
+Only its title line is replaced by the heading above. Recorded on battery power: timings varied by
+about 40% between repeated runs, while node counts are exact and identical to the MSVC run in
+[bench/results/windows11-arm64-release.md](bench/results/windows11-arm64-release.md).
 
 100 random positions of 4 to 16 plies (fixed seed), one search per position, TT of 2^20 entries cleared before every search. Times are per search, i.e. per move.
 
@@ -161,32 +164,33 @@ title line is replaced by the heading above.
 
 | Depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s | TT hit rate | First-move cutoff rate |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 26 | 0.004 | 0.005 | 0.011 | n/a | 12.4% | 87.0% |
-| 4 | 213 | 0.025 | 0.027 | 0.093 | 8.43 | 36.1% | 82.6% |
-| 6 | 1153 | 0.124 | 0.124 | 0.535 | 9.28 | 45.6% | 81.6% |
-| 8 | 4897 | 0.503 | 0.430 | 2.022 | 9.74 | 50.9% | 81.6% |
-| 10 | 17813 | 1.805 | 1.489 | 12.336 | 9.87 | 52.9% | 80.3% |
-| 12 | 56312 | 5.581 | 3.464 | 48.625 | 10.09 | 54.7% | 79.1% |
-| 14 | 167655 | 18.034 | 9.527 | 180.393 | 9.30 | 54.3% | 77.0% |
-| 16 | 490270 | 48.892 | 18.098 | 731.775 | 10.03 | 52.2% | 73.9% |
+| 2 | 26 | 0.013 | 0.013 | 0.038 | 2.00 | 12.4% | 87.0% |
+| 4 | 213 | 0.050 | 0.051 | 0.310 | 4.28 | 36.1% | 82.6% |
+| 6 | 1153 | 0.185 | 0.178 | 0.714 | 6.22 | 45.6% | 81.6% |
+| 8 | 4897 | 0.804 | 0.674 | 4.025 | 6.09 | 50.9% | 81.6% |
+| 10 | 17813 | 2.597 | 2.039 | 18.073 | 6.86 | 52.9% | 80.3% |
+| 12 | 56312 | 10.149 | 6.000 | 83.674 | 5.55 | 54.7% | 79.1% |
+| 14 | 167655 | 35.978 | 19.557 | 297.971 | 4.66 | 54.3% | 77.0% |
+| 16 | 490270 | 90.407 | 24.576 | 1565.364 | 5.42 | 52.2% | 73.9% |
 
 ## Ablation (one technique off at a time)
 
 | Configuration | Depth | Mean nodes | Nodes vs all on | Mean ms | M nodes/s | TT hit rate | First-move cutoff rate |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| All on | 10 | 17813 | 1.0x | 1.808 | 9.85 | 52.9% | 80.3% |
-| No alpha-beta | 10 | 1967171 | 110.4x | 240.995 | 8.16 | 61.7% | n/a |
-| No transposition table | 10 | 64754 | 3.6x | 6.299 | 10.28 | n/a | 70.5% |
-| No move ordering | 10 | 235149 | 13.2x | 30.889 | 7.61 | 57.5% | 32.5% |
-| No iterative deepening | 10 | 15768 | 0.9x | 2.010 | 7.84 | 26.0% | 65.0% |
-| All on | 7 | 2483 | 1.0x | 0.330 | 7.52 | 49.6% | 82.6% |
-| All off (pure minimax) | 7 | 276450 | 111.4x | 36.522 | 7.57 | n/a | n/a |
+| All on | 10 | 17813 | 1.0x | 2.682 | 6.64 | 52.9% | 80.3% |
+| No alpha-beta | 10 | 1967171 | 110.4x | 474.401 | 4.15 | 61.7% | n/a |
+| No transposition table | 10 | 64754 | 3.6x | 9.443 | 6.86 | n/a | 70.5% |
+| No move ordering | 10 | 235149 | 13.2x | 57.397 | 4.10 | 57.5% | 32.5% |
+| No iterative deepening | 10 | 15768 | 0.9x | 3.356 | 4.70 | 26.0% | 65.0% |
+| All on | 7 | 2483 | 1.0x | 0.413 | 6.01 | 49.6% | 82.6% |
+| All off (pure minimax) | 7 | 276450 | 111.4x | 76.377 | 3.62 | n/a | n/a |
 
 ## Difficulty levels (chooseMove)
 
 | Level | Mean depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s |
 |---|---:|---:|---:|---:|---:|---:|
-| Easy | 1.0 | 7 | 0.002 | 0.001 | 0.010 | n/a |
-| Medium | 3.9 | 421 | 0.051 | 0.026 | 0.242 | 8.21 |
-| Hard | 7.0 | 4936 | 0.539 | 0.464 | 2.705 | 9.16 |
-| Impossible | 16.1 | 5578751 | 514.217 | 561.806 | 1001.331 | 10.85 |
+| Easy | 1.0 | 7 | 0.006 | 0.004 | 0.086 | n/a |
+| Medium | 3.9 | 421 | 0.077 | 0.038 | 0.356 | 5.46 |
+| Hard | 7.0 | 4936 | 0.827 | 0.663 | 4.566 | 5.97 |
+| Impossible | 15.4 | 2810993 | 550.156 | 1000.092 | 1002.772 | 5.11 |
+
