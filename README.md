@@ -20,11 +20,13 @@ cmake --build --preset release
 
 Debug build: replace `release` with `debug` (output goes to `build/debug`).
 
-With clang or gcc (no presets):
+On Linux (gcc), use the `linux-release` and `linux-debug` presets (output in `build/linux-release`
+and `build/linux-debug`):
 
 ```
-cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build/release
+cmake --preset linux-release
+cmake --build --preset linux-release
+ctest --preset linux-release
 ```
 
 ## Test

@@ -24,14 +24,41 @@
       "inherits": "msvc-ninja-base",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "gcc-ninja-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Release (gcc, Ninja)",
+      "inherits": "gcc-ninja-base",
+      "binaryDir": "${sourceDir}/build/linux-release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Debug (gcc, Ninja)",
+      "inherits": "gcc-ninja-base",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
     }
   ],
   "buildPresets": [
     { "name": "release", "configurePreset": "release" },
-    { "name": "debug", "configurePreset": "debug" }
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "linux-release", "configurePreset": "linux-release" },
+    { "name": "linux-debug", "configurePreset": "linux-debug" }
   ],
   "testPresets": [
     { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
-    { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } }
+    { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } },
+    { "name": "linux-release", "configurePreset": "linux-release", "output": { "outputOnFailure": true } },
+    { "name": "linux-debug", "configurePreset": "linux-debug", "output": { "outputOnFailure": true } }
   ]
 }
