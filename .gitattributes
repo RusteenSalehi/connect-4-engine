@@ -15,3 +15,7 @@ CMakeLists.txt   text eol=lf
 .gitignore       text eol=lf
 .gitattributes   text eol=lf
 LICENSE          text eol=lf
+*.ts             text eol=lf
+*.mjs            text eol=lf
+*.html           text eol=lf
+*.css            text eol=lf

@@ -15,6 +15,10 @@ compile_commands.json
 # Private checkpoint reports (for review, not for the public repo)
 reports/
 
-# Web phase (later)
+# Web app
 node_modules/
 dist/
+
+# WebAssembly output copied into the web app by `npm run wasm`
+web/src/wasm/c4.js
+web/src/wasm/c4.wasm
