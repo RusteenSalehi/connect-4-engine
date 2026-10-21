@@ -39,6 +39,29 @@ target_include_directories(c4engine PUBLIC engine/include)
 c4_set_warnings(c4engine)
 
 # ---------------------------------------------------------------------------------------------
+# WebAssembly module (wasm preset). Only the engine and its API; tests and tools stay native.
+# ---------------------------------------------------------------------------------------------
+if(EMSCRIPTEN)
+  add_executable(c4wasm wasm/api.cpp)
+  set_target_properties(c4wasm PROPERTIES OUTPUT_NAME c4)  # build/wasm/c4.js and c4.wasm
+  target_link_libraries(c4wasm PRIVATE c4engine)
+  c4_set_warnings(c4wasm)
+  # -O3 comes from the preset's Release build type, for both compiling and linking.
+  target_link_options(c4wasm PRIVATE
+    -sMODULARIZE=1
+    -sEXPORT_ES6=1
+    -sENVIRONMENT=web,worker,node
+    "-sEXPORTED_FUNCTIONS=_c4_choose_move,_c4_last_depth,_c4_last_score,_c4_last_nodes,_c4_last_time_ms,_c4_last_nps,_c4_winning_cells"
+    "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
+    # Fixed memory: the 16 MiB TT plus a little heap and stack. Growth would only matter if
+    # the TT got bigger, and a fixed size keeps memory views stable.
+    -sINITIAL_MEMORY=32MB
+    -sALLOW_MEMORY_GROWTH=0
+  )
+  return()
+endif()
+
+# ---------------------------------------------------------------------------------------------
 # Tests (doctest, pinned to a release tag so every checkout builds against identical code)
 # ---------------------------------------------------------------------------------------------
 include(FetchContent)

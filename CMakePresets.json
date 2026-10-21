@@ -47,13 +47,22 @@
       "inherits": "gcc-ninja-base",
       "binaryDir": "${sourceDir}/build/linux-debug",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "wasm",
+      "displayName": "WebAssembly (Emscripten, Ninja)",
+      "generator": "Ninja",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "binaryDir": "${sourceDir}/build/wasm",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     }
   ],
   "buildPresets": [
     { "name": "release", "configurePreset": "release" },
     { "name": "debug", "configurePreset": "debug" },
     { "name": "linux-release", "configurePreset": "linux-release" },
-    { "name": "linux-debug", "configurePreset": "linux-debug" }
+    { "name": "linux-debug", "configurePreset": "linux-debug" },
+    { "name": "wasm", "configurePreset": "wasm" }
   ],
   "testPresets": [
     { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } },
