@@ -20,6 +20,11 @@ cli/cli.cpp          c4cli (analyze, play)
 tune/tune.cpp        c4tune (evaluation tuning by engine-vs-engine matches)
 wasm/api.cpp         WebAssembly API (extern "C", built by the wasm preset)
 web/scripts/smoke.mjs  Node smoke test for the WebAssembly module
+web/src/             browser game (Vite, TypeScript)
+  game.ts            move list, board derived from it, legality, undo
+  engine.ts          promise-based wrapper around the worker
+  engine.worker.ts   loads the WebAssembly module, answers requests
+  main.ts            page: rendering, game flow, input
 ```
 
 Everything engine-side is plain structs and free functions, except `Position` and
@@ -40,6 +45,20 @@ string, finished game, unknown difficulty) returns -1 from `c4_choose_move` rath
 Memory is fixed at 32 MB with no growth: the TT takes 16 MiB, and nothing else allocates more
 than a few KB. Without growth, the module's memory views never get replaced, which is one less
 thing for the UI to handle.
+
+## Web app
+
+The page keeps one piece of game state, the list of columns played; the board, whose turn it is
+and which columns are open are derived from it (`game.ts`), matching the stateless WASM API.
+Wins are not checked in TypeScript: the page asks the engine (`c4_winning_cells`) after every
+move, so "four in a row" has one definition. The engine runs in a Web Worker (`engine.worker.ts`)
+behind a promise wrapper (`engine.ts`), because Impossible searches for a second and would
+otherwise freeze the page. While a request is out, input is ignored and the columns are marked
+`aria-disabled` (not `disabled`, which would drop keyboard focus). The worker hands Emscripten
+the `.wasm` URL Vite assigns (`?url` import), so the file is found under the `/connect-4-engine/`
+base in dev and in the hashed production build. Engine replies are shown no sooner than 300 ms
+after the request, for display only; the stats show the engine's own time. The mate threshold
+for the score text is copied from `score.hpp` (a comment marks it to keep in sync).
 
 ## Board representation
 

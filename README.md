@@ -57,6 +57,23 @@ double c4_winning_cells(const char* moves);  // bit col * 7 + row of the winning
 `difficulty` is 0 (Easy) to 3 (Impossible). Call them with `ccall` or `cwrap`, as
 `web/scripts/smoke.mjs` does.
 
+## Web app
+
+A browser game in `web/` (Vite 8.3.3, TypeScript 7.0.2, no framework). The engine runs in a Web
+Worker, so Impossible's 1 s search never freezes the page. Needs the Emscripten setup above;
+`npm run dev` and `npm run build` first run `npm run wasm`, which builds the wasm preset and
+copies `c4.js` and `c4.wasm` into `web/src/wasm/`.
+
+```
+cd web
+npm install
+npm run dev       # http://localhost:5173/connect-4-engine/
+npm run build     # type-checks, then writes web/dist/
+npm run preview   # serves web/dist/ at http://localhost:4173/connect-4-engine/
+```
+
+The site is built for the base path `/connect-4-engine/` (GitHub Pages).
+
 ## Test
 
 ```
