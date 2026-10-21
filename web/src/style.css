@@ -253,3 +253,13 @@ footer {
 a {
   color: var(--board-hover);
 }
+
+/* Last in the file, so it overrides the animations above. Users who ask their system for less
+   motion get discs that appear in place and a still spinner (the status text still says the
+   engine is thinking). */
+@media (prefers-reduced-motion: reduce) {
+  .disc,
+  .spinner {
+    animation: none;
+  }
+}
