@@ -29,6 +29,34 @@ cmake --build --preset linux-release
 ctest --preset linux-release
 ```
 
+## WebAssembly
+
+Built with **Emscripten 6.0.12** (pinned; install it with
+`./emsdk install 6.0.12 && ./emsdk activate 6.0.12` and load `emsdk_env.sh`, which sets
+`EMSDK` for the preset). The smoke test was run with Node v24.22.0 (LTS).
+
+```
+cmake --preset wasm
+cmake --build --preset wasm
+node web/scripts/smoke.mjs
+```
+
+Output: `build/wasm/c4.js` (ES6 module factory for web, worker and Node) and
+`build/wasm/c4.wasm`. Exported functions, all stateless (pass the whole move string each call):
+
+```
+int    c4_choose_move(const char* moves, int difficulty, double seed);  // column 0 to 6, or -1
+double c4_last_depth();     // stats of the last c4_choose_move
+double c4_last_score();
+double c4_last_nodes();
+double c4_last_time_ms();
+double c4_last_nps();
+double c4_winning_cells(const char* moves);  // bit col * 7 + row of the winning cells, or 0
+```
+
+`difficulty` is 0 (Easy) to 3 (Impossible). Call them with `ccall` or `cwrap`, as
+`web/scripts/smoke.mjs` does.
+
 ## Test
 
 ```

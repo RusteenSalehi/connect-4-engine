@@ -18,11 +18,28 @@ tests/               doctest unit and property tests
 bench/bench.cpp      c4bench, bench/results/ holds recorded runs
 cli/cli.cpp          c4cli (analyze, play)
 tune/tune.cpp        c4tune (evaluation tuning by engine-vs-engine matches)
+wasm/api.cpp         WebAssembly API (extern "C", built by the wasm preset)
+web/scripts/smoke.mjs  Node smoke test for the WebAssembly module
 ```
 
 Everything engine-side is plain structs and free functions, except `Position` and
 `TranspositionTable`, which are classes because each guards an invariant (the board's bitboards
 and hash must stay consistent; the table's index mask needs a power-of-two size).
+
+## WebAssembly API
+
+`wasm/api.cpp` is the only file the web build adds: seven `extern "C"` functions over
+`chooseMove`. It is stateless on purpose. JavaScript passes the full move string on every call,
+so undo, new game and "analyze this position" are just different strings, and the engine cannot
+drift out of sync with the page. Two things persist between calls: the 2^20-entry TT (a cache,
+which only saves work and never changes a result) and the last search's stats, read by the
+getters right after a move. Every return value is a `double`: node counts and the 49-bit
+winning-cell mask fit exactly, and JavaScript never has to handle BigInt. Invalid input (bad move
+string, finished game, unknown difficulty) returns -1 from `c4_choose_move` rather than trapping.
+
+Memory is fixed at 32 MB with no growth: the TT takes 16 MiB, and nothing else allocates more
+than a few KB. Without growth, the module's memory views never get replaced, which is one less
+thing for the UI to handle.
 
 ## Board representation
 
