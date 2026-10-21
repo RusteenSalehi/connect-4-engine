@@ -1,5 +1,11 @@
 # connect-4-engine
 
+[![CI](https://github.com/RusteenSalehi/connect-4-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/RusteenSalehi/connect-4-engine/actions/workflows/ci.yml)
+[![Pages](https://github.com/RusteenSalehi/connect-4-engine/actions/workflows/deploy.yml/badge.svg)](https://github.com/RusteenSalehi/connect-4-engine/actions/workflows/deploy.yml)
+
+**[Live demo](https://rusteensalehi.github.io/connect-4-engine/)**: play against the engine in your
+browser (compiled to WebAssembly).
+
 A Connect-4 engine in C++20: bitboard board, negamax search with alpha-beta pruning, iterative
 deepening, a transposition table keyed by Zobrist hashing, and a window-counting evaluation with
 all weights in one place. It comes with a benchmark that reports nodes, nodes per second and time
@@ -74,7 +80,16 @@ npm run build     # type-checks, then writes web/dist/
 npm run preview   # serves web/dist/ at http://localhost:4173/connect-4-engine/
 ```
 
-The site is built for the base path `/connect-4-engine/` (GitHub Pages).
+The site is built for the base path `/connect-4-engine/` (GitHub Pages). After rebuilding the
+WebAssembly module, restart `npm run dev`: in WSL on a `/mnt/c` checkout, Vite does not notice the
+copied files change and keeps serving the old `c4.js`.
+
+## Continuous integration and deployment
+
+- `.github/workflows/ci.yml` (every push and pull request): native Release build with gcc and
+  the doctest suite on `ubuntu-latest`, plus the WebAssembly build and Node smoke test.
+- `.github/workflows/deploy.yml` (push to `main`): installs Emscripten 6.0.12, builds the module
+  and the site, and publishes `web/dist` to GitHub Pages. Build output is never committed.
 
 ## Test
 
