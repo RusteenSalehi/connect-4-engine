@@ -28,6 +28,8 @@ self.onmessage = async (event: MessageEvent<Request>) => {
         column,
         depth: stat('c4_last_depth'),
         score: stat('c4_last_score'),
+        winScore: stat('c4_win_score'),
+        minWinScore: stat('c4_min_win_score'),
         nodes: stat('c4_last_nodes'),
         nps: stat('c4_last_nps'),
         timeMs: stat('c4_last_time_ms'),

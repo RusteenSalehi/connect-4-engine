@@ -23,13 +23,6 @@ import {
 // for display; the stats panel shows the engine's own measured time.
 const MIN_THINKING_MS = 300;
 
-// The engine's score scale, copied from engine/include/c4/score.hpp (keep in sync). A win at
-// ply p from the search root scores WIN_SCORE - p; anything at least MIN_WIN_SCORE in size is
-// a proven result rather than a heuristic.
-const WIN_SCORE = 10000;
-const MAX_MOVES = 42;
-const MIN_WIN_SCORE = WIN_SCORE - MAX_MOVES;
-
 // ---------------------------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------------------------
@@ -156,15 +149,15 @@ function renderStats(): void {
   byId('stat-nps').textContent =
     lastMove.timeMs > 0 ? `${Math.round(lastMove.nps).toLocaleString('en-US')} nodes/s` : 'too fast to measure';
   byId('stat-time').textContent = `${lastMove.timeMs.toFixed(1)} ms`;
-  byId('stat-score').textContent = `${describeScore(lastMove.score)} (score ${lastMove.score})`;
+  byId('stat-score').textContent = `${describeScore(lastMove)} (score ${lastMove.score})`;
 }
 
 // Heuristic bands are in evaluation units: a center stone is worth 3 and an open three 5
 // (EvalWeights in engine/include/c4/eval.hpp).
-function describeScore(score: number): string {
+function describeScore({ score, winScore, minWinScore }: EngineMove): string {
   // Mate distances count from before the engine's move, so the engine's own move is ply 1.
-  if (score >= MIN_WIN_SCORE) return `engine sees a forced win in ${plies(WIN_SCORE - score)}`;
-  if (score <= -MIN_WIN_SCORE) return `engine sees you can force a win in ${plies(WIN_SCORE + score)}`;
+  if (score >= minWinScore) return `engine sees a forced win in ${plies(winScore - score)}`;
+  if (score <= -minWinScore) return `engine sees you can force a win in ${plies(winScore + score)}`;
   const size = Math.abs(score);
   const leader = score > 0 ? 'engine' : 'you';
   if (size <= 2) return 'about even';

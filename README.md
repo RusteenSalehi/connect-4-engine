@@ -51,6 +51,8 @@ double c4_last_score();
 double c4_last_nodes();
 double c4_last_time_ms();
 double c4_last_nps();
+double c4_win_score();      // score scale: a win at ply p scores c4_win_score() - p
+double c4_min_win_score();  // any score at least this large in size is a proven result
 double c4_winning_cells(const char* moves);  // bit col * 7 + row of the winning cells, or 0
 ```
 

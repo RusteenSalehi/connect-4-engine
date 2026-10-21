@@ -51,7 +51,7 @@ if(EMSCRIPTEN)
     -sMODULARIZE=1
     -sEXPORT_ES6=1
     -sENVIRONMENT=web,worker,node
-    "-sEXPORTED_FUNCTIONS=_c4_choose_move,_c4_last_depth,_c4_last_score,_c4_last_nodes,_c4_last_time_ms,_c4_last_nps,_c4_winning_cells"
+    "-sEXPORTED_FUNCTIONS=_c4_choose_move,_c4_last_depth,_c4_last_score,_c4_last_nodes,_c4_last_time_ms,_c4_last_nps,_c4_win_score,_c4_min_win_score,_c4_winning_cells"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap"
     # Fixed memory: the 16 MiB TT plus a little heap and stack. Growth would only matter if
     # the TT got bigger, and a fixed size keeps memory views stable.

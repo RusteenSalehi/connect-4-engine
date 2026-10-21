@@ -44,5 +44,13 @@ check(winningCells('1212121') === 15, `winning cells of "1212121" = ${winningCel
 check(winningCells('4453') === 0, 'no winning cells in an unfinished game');
 check(chooseMove('1212121', 3, 1) === -1, 'no move after the game is won');
 
+// The exported score scale (score.hpp: WIN_SCORE 10000, MIN_WIN_SCORE = WIN_SCORE - 42), and a
+// real mate score on it: X to move in "121212" wins at once, at ply 1.
+const winScore = stat('c4_win_score');
+const minWinScore = stat('c4_min_win_score');
+check(winScore === 10000 && minWinScore === 9958, `score scale ${winScore} / ${minWinScore}`);
+check(chooseMove('121212', 2, 1) === 0, 'Hard plays the win in one');
+check(stat('c4_last_score') === winScore - 1, `win in one scores ${stat('c4_last_score')}`);
+
 console.log(failures === 0 ? 'Smoke test passed.' : `Smoke test failed: ${failures} check(s).`);
 process.exit(failures === 0 ? 0 : 1);

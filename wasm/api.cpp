@@ -9,6 +9,7 @@
 #include "c4/difficulty.hpp"
 #include "c4/eval.hpp"
 #include "c4/position.hpp"
+#include "c4/score.hpp"
 #include "c4/tt.hpp"
 
 using namespace c4;
@@ -40,6 +41,11 @@ double c4_last_score() { return last.score; }
 double c4_last_nodes() { return static_cast<double>(last.stats.nodes); }
 double c4_last_time_ms() { return last.timeMs; }
 double c4_last_nps() { return last.timeMs > 0 ? last.stats.nodes / (last.timeMs / 1000) : 0; }
+
+// The score scale, so JavaScript can read a score without copying constants: a win at ply p
+// from the root scores WIN_SCORE - p, and anything at least MIN_WIN_SCORE in size is proven.
+double c4_win_score() { return WIN_SCORE; }
+double c4_min_win_score() { return MIN_WIN_SCORE; }
 
 // Bitmask (bit col * 7 + row, row 0 at the bottom) of the cells that form the last mover's four
 // in a row, or 0 if the game is not won or the moves are invalid. A move that completes two lines

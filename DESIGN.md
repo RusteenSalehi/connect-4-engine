@@ -33,7 +33,7 @@ and hash must stay consistent; the table's index mask needs a power-of-two size)
 
 ## WebAssembly API
 
-`wasm/api.cpp` is the only file the web build adds: seven `extern "C"` functions over
+`wasm/api.cpp` is the only file the web build adds: nine `extern "C"` functions over
 `chooseMove`. It is stateless on purpose. JavaScript passes the full move string on every call,
 so undo, new game and "analyze this position" are just different strings, and the engine cannot
 drift out of sync with the page. Two things persist between calls: the 2^20-entry TT (a cache,
@@ -58,7 +58,8 @@ otherwise freeze the page. While a request is out, input is ignored and the colu
 the `.wasm` URL Vite assigns (`?url` import), so the file is found under the `/connect-4-engine/`
 base in dev and in the hashed production build. Engine replies are shown no sooner than 300 ms
 after the request, for display only; the stats show the engine's own time. The mate threshold
-for the score text is copied from `score.hpp` (a comment marks it to keep in sync).
+for the score text comes from the engine at runtime (`c4_win_score`, `c4_min_win_score`, sent
+with every engine move), so the page holds no copy of the engine's score scale.
 
 ## Board representation
 

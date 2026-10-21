@@ -8,6 +8,11 @@ export interface EngineMove {
   column: number; // 0 to 6
   depth: number;
   score: number; // engine's point of view, before its move
+  // The engine's score scale (c4_win_score, c4_min_win_score), sent with every score so the page
+  // never copies engine constants: a win at ply p scores winScore - p, and anything at least
+  // minWinScore in size is a proven result.
+  winScore: number;
+  minWinScore: number;
   nodes: number;
   nps: number;
   timeMs: number;
