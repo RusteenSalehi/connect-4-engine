@@ -1,0 +1,61 @@
+# Builds the browser game and publishes it to https://rusteensalehi.github.io/connect-4-engine/.
+# Requires Settings > Pages > Source = "GitHub Actions".
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+# deploy-pages needs to write to Pages and to prove the workflow's identity (OIDC token).
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. A newer push waits instead of cancelling a deployment midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      # The same pinned Emscripten as local development (see the README).
+      - name: Install Emscripten 6.0.12
+        run: |
+          git clone --depth 1 --branch 6.0.12 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.12
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.12
+      # emsdk_env.sh is sourced only here, because it puts emsdk's own Node first on the PATH.
+      # npm run build's prebuild step then finds the module already built and only copies it.
+      - name: Build WebAssembly
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --preset wasm
+          cmake --build --preset wasm
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+      - name: Build site
+        working-directory: web
+        run: npm run build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
