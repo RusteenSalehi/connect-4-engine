@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Connect 4 Engine</title>
+    <!-- An empty icon, so the browser does not request a favicon.ico that does not exist. -->
+    <link rel="icon" href="data:," />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Connect 4</h1>
+
+      <section class="controls" aria-label="Game controls">
+        <label>Difficulty <select id="difficulty"></select></label>
+        <label>
+          First move
+          <select id="first">
+            <option value="1">You</option>
+            <option value="2">Engine</option>
+          </select>
+        </label>
+        <span class="buttons">
+          <button id="new-game" type="button">New game</button>
+          <button id="undo" type="button">Undo</button>
+        </span>
+      </section>
+      <p class="hint">Click a column or press 1 to 7. Arrows move between columns, Enter drops.</p>
+
+      <div class="status-row">
+        <span id="spinner" class="spinner" aria-hidden="true" hidden></span>
+        <p id="status" aria-live="polite"></p>
+      </div>
+
+      <div id="board" class="board" role="group" aria-label="Board, 7 columns"></div>
+
+      <section id="stats" class="stats" aria-label="Engine stats" hidden>
+        <h2>Engine's last move</h2>
+        <dl>
+          <dt>Column</dt><dd id="stat-column"></dd>
+          <dt>Depth reached</dt><dd id="stat-depth"></dd>
+          <dt>Nodes</dt><dd id="stat-nodes"></dd>
+          <dt>Speed</dt><dd id="stat-nps"></dd>
+          <dt>Time</dt><dd id="stat-time"></dd>
+          <dt>Assessment</dt><dd id="stat-score"></dd>
+        </dl>
+      </section>
+    </main>
+
+    <footer>
+      <a href="https://github.com/RusteenSalehi/connect-4-engine">Source on GitHub</a>
+    </footer>
+  </body>
+</html>
