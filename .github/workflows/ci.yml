@@ -1,0 +1,49 @@
+# Builds and tests on a clean GitHub runner, so passing tests do not depend on one laptop.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  native:
+    name: Native tests (gcc, Release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The presets use the Ninja generator.
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake --preset linux-release
+      - name: Build
+        run: cmake --build --preset linux-release
+      # The test binary itself (not ctest), so the log shows doctest's pass counts.
+      - name: Test
+        run: ./build/linux-release/c4tests
+
+  wasm:
+    name: WebAssembly smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      # The same pinned Emscripten as local development (see the README).
+      - name: Install Emscripten 6.0.12
+        run: |
+          git clone --depth 1 --branch 6.0.12 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.12
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.12
+      # emsdk_env.sh sets EMSDK for the preset. It is sourced only in this step, because it also
+      # puts emsdk's own Node first on the PATH, and the smoke test should use Node 24.
+      - name: Build WebAssembly
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --preset wasm
+          cmake --build --preset wasm
+      - name: Smoke test
+        run: node web/scripts/smoke.mjs
