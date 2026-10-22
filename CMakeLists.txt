@@ -39,7 +39,8 @@ target_include_directories(c4engine PUBLIC engine/include)
 c4_set_warnings(c4engine)
 
 # ---------------------------------------------------------------------------------------------
-# WebAssembly module (wasm preset). Only the engine and its API; tests and tools stay native.
+# WebAssembly (wasm preset): the web module, plus c4bench for Node. Tests and other tools stay
+# native.
 # ---------------------------------------------------------------------------------------------
 if(EMSCRIPTEN)
   add_executable(c4wasm wasm/api.cpp)
@@ -58,6 +59,12 @@ if(EMSCRIPTEN)
     -sINITIAL_MEMORY=32MB
     -sALLOW_MEMORY_GROWTH=0
   )
+  # c4bench for Node (node build/wasm/c4bench.js), to compare WebAssembly with native speed on
+  # the same machine. Same fixed 32 MB memory as the web module.
+  add_executable(c4bench bench/bench.cpp)
+  target_link_libraries(c4bench PRIVATE c4engine)
+  c4_set_warnings(c4bench)
+  target_link_options(c4bench PRIVATE -sENVIRONMENT=node -sINITIAL_MEMORY=32MB -sALLOW_MEMORY_GROWTH=0)
   return()
 endif()
 
