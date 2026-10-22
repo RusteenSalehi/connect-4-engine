@@ -113,4 +113,8 @@ private:
 // so a seed always names the same positions.
 std::vector<Position> randomPositions(int count, int minPlies, int maxPlies, std::uint64_t seed);
 
+// All 49 positions after two moves (first player's column, then second player's), in column
+// order. The fixed opening set for engine-vs-engine matches (c4tune, c4match).
+std::vector<Position> twoPlyOpenings();
+
 }  // namespace c4

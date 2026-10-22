@@ -94,6 +94,19 @@ std::vector<Position> randomPositions(int count, int minPlies, int maxPlies, std
     return out;
 }
 
+std::vector<Position> twoPlyOpenings() {
+    std::vector<Position> openings;
+    for (int first = 0; first < WIDTH; ++first) {
+        for (int second = 0; second < WIDTH; ++second) {
+            Position p;
+            p.play(first);
+            p.play(second);
+            openings.push_back(p);
+        }
+    }
+    return openings;
+}
+
 std::string Position::toAscii() const {
     Bitboard first = firstPlayerStones();
     std::string out;

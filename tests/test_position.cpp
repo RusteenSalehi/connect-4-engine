@@ -176,6 +176,17 @@ TEST_CASE("random positions are reproducible, in the ply range, and undecided") 
     }
 }
 
+TEST_CASE("the two-ply openings are all 49 distinct two-move starts") {
+    const auto openings = twoPlyOpenings();
+    REQUIRE(openings.size() == 49);
+    CHECK(openings.front() == parse("11"));
+    CHECK(openings.back() == parse("77"));
+    for (std::size_t i = 0; i < openings.size(); ++i) {
+        CHECK(openings[i].moves() == 2);
+        for (std::size_t j = 0; j < i; ++j) CHECK_FALSE(openings[i] == openings[j]);
+    }
+}
+
 TEST_CASE("mirror reflects left to right") {
     CHECK(parse("1234").mirror() == parse("7654"));
     CHECK(parse("4").mirror() == parse("4"));  // the center column maps to itself

@@ -45,19 +45,6 @@ struct MatchResult {
     double fraction() const { return score() / games(); }
 };
 
-std::vector<Position> twoPlyOpenings() {
-    std::vector<Position> openings;
-    for (int first = 0; first < WIDTH; ++first) {
-        for (int second = 0; second < WIDTH; ++second) {
-            Position p;
-            p.play(first);
-            p.play(second);
-            openings.push_back(p);
-        }
-    }
-    return openings;
-}
-
 // Plays one game from `pos` to the end. Returns 1, 0.5 or 0 for the side with weights `a`.
 double playGame(Position pos, const EvalWeights& a, const EvalWeights& b, bool aMovesFirst,
                 int depth, TranspositionTable& tt) {
