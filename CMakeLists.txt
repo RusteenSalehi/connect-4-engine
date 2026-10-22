@@ -109,3 +109,7 @@ c4_set_warnings(c4cli)
 add_executable(c4tune tune/tune.cpp)
 target_link_libraries(c4tune PRIVATE c4engine)
 c4_set_warnings(c4tune)
+
+add_executable(c4match match/match.cpp)
+target_link_libraries(c4match PRIVATE c4engine)
+c4_set_warnings(c4match)
