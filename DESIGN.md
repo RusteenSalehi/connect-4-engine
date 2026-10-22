@@ -19,6 +19,7 @@ bench/bench.cpp      c4bench, bench/results/ holds recorded runs
 cli/cli.cpp          c4cli (analyze, play)
 tune/tune.cpp        c4tune (evaluation tuning by engine-vs-engine matches)
 match/match.cpp      c4match (difficulty levels played against each other)
+analysis/            loss analysis: c4replay, c4solve (independent solver), c4probe, scripts
 wasm/api.cpp         WebAssembly API (extern "C", built by the wasm preset with c4bench for Node)
 web/scripts/smoke.mjs  Node smoke test for the WebAssembly module
 web/src/             browser game (Vite, TypeScript)
@@ -281,7 +282,46 @@ games depend on the machine's speed.
 
 Every step up wins clearly. Impossible still loses 18 of 98 games to Hard, so it is not a perfect
 player: it searches about 16 plies, not to the end of the game, and its evaluation ignores threat
-parity. Which of these decides the lost games has not been analyzed.
+parity. In a replay of the pairing (15 losses), an independent solver showed that 5 losses came
+from openings already lost for Impossible, and 10 from a losing move at plies 2 to 8 that only a
+search of 16 to 29 plies or deeper would have avoided.
+
+## Reproducing the loss analysis
+
+The tools in `analysis/` produce the numbers above. They are not built by default and not part
+of the wasm build.
+
+- `c4replay` replays `c4match`'s Impossible vs Hard pairing (same seeds, same per-move TT
+  clearing) and logs every move with Impossible's depth and score.
+- `c4solve` is a weak solver (win, draw or loss for the side to move), written without the
+  engine's code, after Pascal Pons' solver design. It proves early positions a 1 s engine
+  search cannot.
+- `classify.py` marks each loss as (a) lost from the start, if every position Impossible moved
+  from was lost, or (b) a mistake, at the first move from a won or drawn position into a lost one.
+- `c4probe` computes exact root scores at depth 1, 2, 3, ... at each mistake, picking a move by
+  Impossible's rule, and `depths.py` reports the depth from which that pick is always non-losing.
+
+From the repository root, writing into the ignored `build/analysis/`:
+
+```
+cmake --preset linux-release
+cmake --build --preset linux-release --target c4replay c4solve c4probe
+mkdir -p build/analysis
+build/linux-release/c4replay > build/analysis/replay.txt
+awk '$1=="game" && $8=="loss" {for (i = 2; i <= length($10); i++) print substr($10, 1, i)}' \
+  build/analysis/replay.txt | sort -u > build/analysis/positions.txt
+build/linux-release/c4solve 120 < build/analysis/positions.txt > build/analysis/solved.txt
+python3 analysis/classify.py build/analysis
+build/linux-release/c4solve 120 < build/analysis/alts.in > build/analysis/alts.txt
+build/linux-release/c4probe 300 < build/analysis/probe.in > build/analysis/probe.txt
+python3 analysis/depths.py build/analysis
+```
+
+The arguments are time budgets in seconds per position. On one core the replay takes about 10
+minutes, the solve step about 20 and the probe step about an hour; the input files can be split
+and run in parallel. A `?` in `solved.txt` means the solver ran out of time on that position.
+Impossible stops on a clock, so a replay on another machine, or under load, plays somewhat
+different games: the counts are reproducible in kind, not exactly.
 
 ## Testing
 

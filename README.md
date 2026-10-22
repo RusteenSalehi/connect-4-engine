@@ -264,6 +264,7 @@ engine/include/c4/, engine/src/   the engine library: position, zobrist, score, 
 tests/                            doctest tests
 bench/bench.cpp, bench/results/   c4bench and recorded runs
 match/match.cpp                   c4match (difficulty strength match)
+analysis/                         loss analysis tools (solver, replay, probe), see DESIGN.md
 tune/tune.cpp                     c4tune (evaluation tuning)
 cli/cli.cpp                       c4cli (analyze, play)
 wasm/api.cpp                      the WebAssembly API

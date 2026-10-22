@@ -120,3 +120,15 @@ c4_set_warnings(c4tune)
 add_executable(c4match match/match.cpp)
 target_link_libraries(c4match PRIVATE c4engine)
 c4_set_warnings(c4match)
+
+# Loss analysis (analysis/, see DESIGN.md): built only on request, e.g. --target c4solve.
+add_executable(c4solve EXCLUDE_FROM_ALL analysis/solve.cpp)
+c4_set_warnings(c4solve)
+
+add_executable(c4replay EXCLUDE_FROM_ALL analysis/replay.cpp)
+target_link_libraries(c4replay PRIVATE c4engine)
+c4_set_warnings(c4replay)
+
+add_executable(c4probe EXCLUDE_FROM_ALL analysis/probe.cpp)
+target_link_libraries(c4probe PRIVATE c4engine)
+c4_set_warnings(c4probe)
