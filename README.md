@@ -105,6 +105,10 @@ Each level scores 78% or more against the level below it, so the levels really a
 strength. Impossible still loses 18 of 98 games to Hard: in 1 s it searches about 16 plies, not to
 the end of the game, so it is not a perfect player. The first two pairings take seconds; Impossible
 vs Hard took 9 minutes. Output: [bench/results/strength-match.md](bench/results/strength-match.md).
+In a replay of this pairing (15 losses), an independent solver showed that 5 losses came from
+openings already lost for Impossible, and 10 from a losing move at plies 2 to 8 that only a search
+of 16 to 29 plies or deeper would have avoided, against the 14 to 20 plies Impossible reached in
+its second.
 
 ## Benchmarks
 
