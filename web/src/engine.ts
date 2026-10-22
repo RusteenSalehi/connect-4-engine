@@ -30,7 +30,15 @@ const worker = new Worker(new URL('./engine.worker.ts', import.meta.url), { type
 let nextId = 0;
 const pending = new Map<number, { resolve: (value: unknown) => void; reject: (e: Error) => void }>();
 
+// The worker answers nothing until the WASM module has downloaded and compiled, so the first
+// answer of any kind means the engine is ready.
+let loaded = false;
+export function engineLoaded(): boolean {
+  return loaded;
+}
+
 worker.onmessage = (event: MessageEvent<Response>) => {
+  loaded = true;
   const { id, value, error } = event.data;
   const p = pending.get(id);
   pending.delete(id);

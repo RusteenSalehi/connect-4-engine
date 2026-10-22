@@ -2,7 +2,7 @@
 // every change. All engine work goes through engine.ts.
 
 import './style.css';
-import { chooseMove, DIFFICULTIES, type EngineMove, winningCells } from './engine';
+import { chooseMove, DIFFICULTIES, engineLoaded, type EngineMove, winningCells } from './engine';
 import {
   canPlay,
   canUndo,
@@ -37,6 +37,10 @@ let error = '';
 
 function gameOver(): boolean {
   return winMask !== 0 || isBoardFull(moves);
+}
+
+function loadingEngine(): boolean {
+  return busy && !engineLoaded();
 }
 
 function humanCanMove(): boolean {
@@ -122,7 +126,7 @@ function render(): void {
     }
   }
 
-  spinnerEl.hidden = !thinking;
+  spinnerEl.hidden = !thinking && !loadingEngine();
   statusEl.textContent = statusText();
   newGameEl.disabled = busy;
   undoEl.disabled = busy || !canUndo(moves, human);
@@ -134,6 +138,9 @@ function statusText(): string {
   if (error) return `Engine error: ${error}. Start a new game to try again.`;
   if (winMask !== 0) return playerToMove(moves) === human ? 'The engine wins.' : 'You win!';
   if (isBoardFull(moves)) return 'Draw: the board is full.';
+  // On a slow connection the first move waits for the WASM download; say so instead of keeping
+  // "Your turn" or claiming the engine is already thinking.
+  if (loadingEngine()) return 'Loading engine...';
   if (thinking) return `${DIFFICULTIES[Number(difficultyEl.value)]} engine is thinking...`;
   if (busy) return statusEl.textContent ?? ''; // a brief wait between moves: keep the last message
   return `Your turn (${you}). Pick a column.`;
