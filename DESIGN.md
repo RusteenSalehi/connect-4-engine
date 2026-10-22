@@ -18,7 +18,8 @@ tests/               doctest unit and property tests
 bench/bench.cpp      c4bench, bench/results/ holds recorded runs
 cli/cli.cpp          c4cli (analyze, play)
 tune/tune.cpp        c4tune (evaluation tuning by engine-vs-engine matches)
-wasm/api.cpp         WebAssembly API (extern "C", built by the wasm preset)
+match/match.cpp      c4match (difficulty levels played against each other)
+wasm/api.cpp         WebAssembly API (extern "C", built by the wasm preset with c4bench for Node)
 web/scripts/smoke.mjs  Node smoke test for the WebAssembly module
 web/src/             browser game (Vite, TypeScript)
   game.ts            move list, board derived from it, legality, undo
@@ -215,7 +216,8 @@ improvement. The evaluation also ignores which threats can actually be completed
 
 `c4tune` tunes the weights by playing the engine against itself.
 
-**Match.** Two weight sets play all 49 two-ply openings (every first move times every reply),
+**Match.** Two weight sets play all 49 two-ply openings (`twoPlyOpenings()` in `position.hpp`,
+shared with `c4match`: every first move times every reply),
 each opening twice with colors swapped, at a fixed search depth (4 for tuning). Win 1, draw 0.5,
 loss 0, out of 98. Each move is a fresh search with an empty TT, so the two players never read
 each other's scores. The engine has no randomness, so a match between the same two weight sets
@@ -262,6 +264,25 @@ What this does and does not show:
   threat parity could still find something. I have not run those, because choosing settings
   until something passes would make the result meaningless.
 
+## Strength match
+
+`c4match` checks that each difficulty level is actually stronger than the one below it. Each
+pairing (Medium vs Easy, Hard vs Medium, Impossible vs Hard) plays the 49 two-ply openings twice
+with colors swapped, the same opening set as `c4tune`. Move m of game g uses seed
+`SEED + 64 g + m`, and every move starts from an empty TT, so the two sides never share search
+results and Easy, Medium and Hard games replay exactly. Impossible stops on a time budget, so its
+games depend on the machine's speed.
+
+| Pairing | W / D / L (stronger side) | Score |
+|---|---|---|
+| Medium vs Easy | 87 / 2 / 9 | 89.8% |
+| Hard vs Medium | 86 / 6 / 6 | 90.8% |
+| Impossible vs Hard | 73 / 7 / 18 | 78.1% |
+
+Every step up wins clearly. Impossible still loses 18 of 98 games to Hard, so it is not a perfect
+player: it searches about 16 plies, not to the end of the game, and its evaluation ignores threat
+parity. Which of these decides the lost games has not been analyzed.
+
 ## Testing
 
 - **Minimax equivalence.** 60 seeded random positions, depths 1 to 6, all 16 combinations of the
@@ -296,6 +317,12 @@ move" is the time of one such search. The seed and TT size are constants, so run
 across machines. The ablation table turns off one technique at a time at one depth, and compares
 pure minimax with the full engine at a shallower depth where minimax finishes quickly.
 
+The same `bench.cpp` also builds with Emscripten (`build/wasm/c4bench.js`, run in Node), so the
+native and WebAssembly builds can be compared on one machine. Node counts at fixed depths are
+identical under MSVC, gcc and Emscripten, which shows the search is deterministic across
+compilers. On the recorded ARM64 laptop the WebAssembly build took 13 to 22% less time than gcc's
+native build at depths 6 to 16; the cause has not been investigated.
+
 What the recorded results show (see the README for the numbers):
 
 - **Alpha-beta and move ordering matter most**: without alpha-beta the engine searches about 110
@@ -306,7 +333,7 @@ What the recorded results show (see the README for the numbers):
   itself in time control, not in fixed-depth node counts.
 - **Difficulty levels cost very different amounts**: Easy, Medium and Hard all take under 5 ms per
   move even in the worst case; Impossible averages about half a second, because about half of the
-  positions end early with a proven win or loss (searched to depth 15 to 16 on average).
+  positions end early with a proven win or loss (searched to depth 16.4 on average).
 - **First-move cutoff rate is about 80%** with ordering on, so most cutoffs come from the first
   move tried. That leaves limited room for killer moves (see below).
 
