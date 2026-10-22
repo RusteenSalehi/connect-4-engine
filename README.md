@@ -4,255 +4,289 @@
 [![Pages](https://github.com/RusteenSalehi/connect-4-engine/actions/workflows/deploy.yml/badge.svg)](https://github.com/RusteenSalehi/connect-4-engine/actions/workflows/deploy.yml)
 
 **[Live demo](https://rusteensalehi.github.io/connect-4-engine/)**: play against the engine in your
-browser (compiled to WebAssembly).
+browser.
 
-A Connect-4 engine in C++20: bitboard board, negamax search with alpha-beta pruning, iterative
-deepening, a transposition table keyed by Zobrist hashing, and a window-counting evaluation with
-all weights in one place. It comes with a benchmark that reports nodes, nodes per second and time
-per move by depth plus an ablation table, a terminal CLI, and tests that prove every combination
-of search techniques returns the same score as plain minimax.
+A Connect-4 engine in C++20 with negamax search, alpha-beta pruning, iterative deepening and a
+Zobrist-keyed transposition table over a bitboard board. Four difficulty levels are built into the
+engine, and a match tool shows each one beats the level below it. The same engine compiles to
+WebAssembly and runs in a browser game on GitHub Pages, in a Web Worker so the page never
+freezes. A benchmark reports nodes, nodes per second and time per move by depth, plus an
+ablation table and a native vs WebAssembly comparison. Tests prove every combination of search
+techniques returns the plain-minimax score. Details and reasoning: [DESIGN.md](DESIGN.md).
 
-How it works and why: [DESIGN.md](DESIGN.md).
+![The browser game](docs/screenshot.png)
 
-## Build
+## Features
 
-Requires CMake 3.21+, Ninja, and a C++20 compiler. On Windows, run these from a
-"Developer PowerShell / Command Prompt for VS 2022" (ARM64 or x64) so `cl` is on the PATH.
+- **Engine**: bitboards with sentinel bits, negamax with fail-soft alpha-beta, iterative
+  deepening with a time limit, a 2^20-entry transposition table keyed by Zobrist hashing (bound
+  flags, mate-distance correction), TT-move-first and center-out move ordering, and a
+  window-counting evaluation with all weights in one struct.
+- **Difficulty levels** Easy, Medium, Hard and Impossible, chosen inside the engine from exact
+  root-move scores, with seeded randomness.
+- **Tools**: `c4bench` (benchmark), `c4match` (strength match between levels), `c4tune`
+  (self-play weight tuning), `c4cli` (analyze a position or play in the terminal).
+- **Browser game**: TypeScript and Vite, engine in a Web Worker, animated board, keyboard play,
+  undo, win highlighting, live engine stats, light and dark mode, phone layout.
+- **Tests and CI**: 43 doctest cases on every push (gcc on Ubuntu), a WebAssembly smoke
+  test in Node, and automatic deployment to GitHub Pages.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph engine["c4engine (C++20 static library)"]
+    position["Position: bitboards, Zobrist hash"]
+    search["search: negamax, alpha-beta, iterative deepening"]
+    tt["Transposition table"]
+    eval["Evaluation (EvalWeights)"]
+    difficulty["chooseMove: difficulty levels"]
+    difficulty --> search
+    search --> tt
+    search --> eval
+    search --> position
+  end
+  native["Native tools: c4tests, c4bench, c4match, c4tune, c4cli"] --> engine
+  api["wasm/api.cpp: stateless C API"] --> engine
+  api -- "Emscripten" --> module["c4.js + c4.wasm"]
+  subgraph browser["Browser (web/)"]
+    ui["main.ts: board, controls, stats"] -- "postMessage" --> worker["engine.worker.ts"]
+  end
+  worker --> module
+  ci["GitHub Actions: CI (tests, smoke test)"] -.-> native
+  ci -.-> module
+  pages["GitHub Actions: build and deploy to Pages"] -.-> browser
 ```
-cmake --preset release
-cmake --build --preset release
-```
 
-Debug build: replace `release` with `debug` (output goes to `build/debug`).
+## Engine design
 
-On Linux (gcc), use the `linux-release` and `linux-debug` presets (output in `build/linux-release`
-and `build/linux-debug`):
+- **Bitboards.** Two 64-bit words (side to move, all stones), 7 bits per column including an
+  empty sentinel bit, so win detection is four shift-and-AND steps and playing a move is one
+  addition. `Position` is 32 bytes and copied per child, so there is no undo code.
+- **Negamax with alpha-beta.** One negamax function, fail-soft. An immediate win is detected
+  before anything else, so wins are seen one ply past the depth limit and scored by distance
+  (`10000 - ply`), which makes the engine win fast and lose slowly.
+- **Iterative deepening.** Depth 1, 2, 3, ... until the depth limit, the time limit or a proven
+  result. Each iteration leaves best moves in the TT that order the next one.
+- **Transposition table.** 2^20 16-byte entries (16 MiB), always-replace, keyed by a 64-bit
+  Zobrist hash that `play()` updates incrementally. Entries store bound flags (exact, lower,
+  upper) and mate scores relative to the node, so a mate found at one ply stays correct at
+  another.
+- **Move ordering.** The TT's best move first, then columns from the center out. With ordering
+  on, about 80% of beta cutoffs come from the first move tried.
+- **Evaluation.** Counts open threes and twos over the board's 69 four-cell windows plus center
+  stones. All three weights live in `EvalWeights`.
+- **Tuning harness.** `c4tune` hill-climbs the weights by engine-vs-engine matches (49 two-ply
+  openings, colors swapped, 98 games per match, a candidate must score above 55%), then validates
+  at a depth it never tuned at. **Result: no change was accepted.** Every one-step neighbour of
+  the default weights scored between 43.4% and 52.6% against them, so the defaults are a local
+  optimum under this method. That is not proof they are globally best.
+
+## Difficulty levels and strength
+
+| Level | Search | Move choice |
+|---|---|---|
+| Easy | 1 ply | Random, weighted toward better moves (softmax). Always takes a win in one and blocks a loss in one. |
+| Medium | 3 to 5 plies (random per move) | Random among moves within 3 points of the best. |
+| Hard | 7 plies | A best move, random among ties. |
+| Impossible | 10 plies, then deeper for up to 1 s | The best move, most central on ties. Stops early once the result is proven. |
+
+**Strength match** (`c4match`): each pairing plays all 49 two-ply openings twice with colors
+swapped (98 games), every move with a fixed seed and an empty TT. Results are from the stronger
+level's point of view.
+
+| Pairing | Games | Wins | Draws | Losses | Score | Minutes |
+|---|---:|---:|---:|---:|---:|---:|
+| Medium vs Easy | 98 | 87 | 2 | 9 | 89.8% | 0.0 |
+| Hard vs Medium | 98 | 86 | 6 | 6 | 90.8% | 0.0 |
+| Impossible vs Hard | 98 | 73 | 7 | 18 | 78.1% | 9.0 |
+
+Each level scores 78% or more against the level below it, so the levels really are ordered by
+strength. Impossible still loses 18 of 98 games to Hard: in 1 s it searches about 16 plies, not to
+the end of the game, so it is not a perfect player. The first two pairings take seconds; Impossible
+vs Hard took 9 minutes. Output: [bench/results/strength-match.md](bench/results/strength-match.md).
+
+## Benchmarks
+
+`c4bench` searches 100 seeded random positions of 4 to 16 plies, one search per position, with
+the TT cleared before each, so "time per move" is one search from a cold table.
+Recorded 2026-10-21 on a Dell XPS 13 9345 (Snapdragon X Elite X1E80100), plugged in, WSL2
+Ubuntu 26.04: native gcc 15.2 Release, and WebAssembly from Emscripten 6.0.12 (-O3) in Node
+v24.22.0. Each build ran three times back to back; the tables show, verbatim, the run that was the
+median at depth 12.
+
+### Time per move by depth (native)
+
+| Depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s | TT hit rate | First-move cutoff rate |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 26 | 0.005 | 0.005 | 0.013 | n/a | 12.4% | 87.0% |
+| 4 | 213 | 0.024 | 0.025 | 0.079 | 9.01 | 36.1% | 82.6% |
+| 6 | 1153 | 0.109 | 0.107 | 0.378 | 10.62 | 45.6% | 81.6% |
+| 8 | 4897 | 0.421 | 0.363 | 1.778 | 11.64 | 50.9% | 81.6% |
+| 10 | 17813 | 1.460 | 1.194 | 10.181 | 12.20 | 52.9% | 80.3% |
+| 12 | 56312 | 4.568 | 2.939 | 41.966 | 12.33 | 54.7% | 79.1% |
+| 14 | 167655 | 13.046 | 7.033 | 146.296 | 12.85 | 54.3% | 77.0% |
+| 16 | 490270 | 38.539 | 13.067 | 577.647 | 12.72 | 52.2% | 73.9% |
+
+**Stability:** the depth-12 mean over the three native runs was 4.688, 4.410 and 4.568 ms, a
+6.3% spread (max over min), with identical node counts. The first native run's difficulty table
+was an outlier (Hard 1.61 ms mean, against 0.42 and 0.43 ms in runs 2 and 3) and is not used.
+
+### Difficulty levels (native)
+
+| Level | Mean depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s |
+|---|---:|---:|---:|---:|---:|---:|
+| Easy | 1.0 | 7 | 0.002 | 0.002 | 0.022 | n/a |
+| Medium | 3.9 | 421 | 0.042 | 0.021 | 0.209 | 10.10 |
+| Hard | 7.0 | 4936 | 0.426 | 0.360 | 2.275 | 11.58 |
+| Impossible | 16.4 | 7482804 | 497.684 | 378.176 | 1001.114 | 15.04 |
+
+### Ablation (native, one technique off at a time)
+
+| Configuration | Depth | Mean nodes | Nodes vs all on | Mean ms | M nodes/s | TT hit rate | First-move cutoff rate |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| All on | 10 | 17813 | 1.0x | 1.430 | 12.45 | 52.9% | 80.3% |
+| No alpha-beta | 10 | 1967171 | 110.4x | 185.905 | 10.58 | 61.7% | n/a |
+| No transposition table | 10 | 64754 | 3.6x | 4.654 | 13.91 | n/a | 70.5% |
+| No move ordering | 10 | 235149 | 13.2x | 22.291 | 10.55 | 57.5% | 32.5% |
+| No iterative deepening | 10 | 15768 | 0.9x | 1.221 | 12.92 | 26.0% | 65.0% |
+| All on | 7 | 2483 | 1.0x | 0.226 | 10.98 | 49.6% | 82.6% |
+| All off (pure minimax) | 7 | 276450 | 111.4x | 29.957 | 9.23 | n/a | n/a |
+
+### Native vs WebAssembly
+
+The same `bench/bench.cpp`, compiled by Emscripten and run in Node on the same machine right after
+the native runs. Node counts are identical at every fixed depth, so the times compare the same
+work. **WebAssembly was faster, not slower:** from depth 6 to 16 it took 0.78 to 0.87 times the
+native time.
+A wall-clock check agrees (whole `c4bench --depths 18` runs: 87.7 s native, 82.2 s WebAssembly, of
+which about 50 s each is Impossible's fixed budget), and building native with `-mcpu=native` made it
+only 4 to 6% faster. I have not investigated the cause; it holds for this ARM64 laptop, gcc 15.2 and
+Node's V8, and may not elsewhere.
+
+| Depth | Mean nodes (both) | Native mean ms | WASM mean ms | Native M nodes/s | WASM M nodes/s | WASM time / native |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 26 | 0.005 | 0.008 | n/a | n/a | 1.60x |
+| 4 | 213 | 0.024 | 0.024 | 9.01 | 8.91 | 1.00x |
+| 6 | 1153 | 0.109 | 0.095 | 10.62 | 12.14 | 0.87x |
+| 8 | 4897 | 0.421 | 0.345 | 11.64 | 14.21 | 0.82x |
+| 10 | 17813 | 1.460 | 1.179 | 12.20 | 15.11 | 0.81x |
+| 12 | 56312 | 4.568 | 3.887 | 12.33 | 14.49 | 0.85x |
+| 14 | 167655 | 13.046 | 10.591 | 12.85 | 15.83 | 0.81x |
+| 16 | 490270 | 38.539 | 30.055 | 12.72 | 16.31 | 0.78x |
+
+| Level | Native mean depth | WASM mean depth | Native mean nodes | WASM mean nodes | Native mean ms | WASM mean ms | Native M nodes/s | WASM M nodes/s |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Easy | 1.0 | 1.0 | 7 | 7 | 0.002 | 0.005 | n/a | n/a |
+| Medium | 3.9 | 3.9 | 421 | 421 | 0.042 | 0.033 | 10.10 | 12.83 |
+| Hard | 7.0 | 7.0 | 4936 | 4936 | 0.426 | 0.342 | 11.58 | 14.44 |
+| Impossible | 16.4 | 16.5 | 7482804 | 8577721 | 497.684 | 496.727 | 15.04 | 17.27 |
+
+Impossible runs for a fixed 1 s, so its row compares how much it gets done: 8.58 M nodes and mean
+depth 16.5 in WebAssembly vs 7.48 M nodes and depth 16.4 native. WebAssembly depth-12 times over
+its three runs: 3.512, 3.887 and 4.050 ms (15.3% spread). Rows under a millisecond in total
+show "n/a" for nodes per second, because the clock resolution dominates there.
+
+Full outputs: [bench/results](bench/results).
+
+## Testing
+
+- **Minimax equivalence (differential).** On 60 seeded random positions at depths 1 to 6, all 16
+  on/off combinations of alpha-beta, TT, move ordering and iterative deepening must return the
+  plain-minimax score and a minimax-best move. Mutation testing confirmed it catches real TT
+  bugs (a fail-low stored as exact, a lower bound accepted at alpha, ignoring stored depth).
+- **Other differential tests**: bitboard win detection against a naive checker on 20,000 boards,
+  the incremental Zobrist hash against a from-scratch hash over 200 games, and each level's root
+  scores against plain minimax.
+- **Mate distance through a reused TT**: after the best move, a proven result must be exactly
+  one ply closer, which catches mate-score store and probe bugs the equivalence test misses.
+- **Difficulty levels**: same seed gives the same move, Hard always plays a best move, Easy
+  always takes and blocks wins in one, Impossible reaches depth 10.
+- **Cross-compiler determinism**: the benchmark's node counts are identical under MSVC (Windows),
+  gcc (Linux) and Emscripten (WebAssembly in Node). This is checked by comparing benchmark
+  outputs, not by an automated test.
+- **CI** builds and runs the tests on `ubuntu-latest` with gcc, and builds the WebAssembly module
+  and runs its smoke test, on every push and pull request.
+
+## Build and run
+
+Requires CMake 3.21+, Ninja and a C++20 compiler.
+
+**Native (Linux, gcc):**
 
 ```
 cmake --preset linux-release
 cmake --build --preset linux-release
-ctest --preset linux-release
+build/linux-release/c4tests                 # tests
+build/linux-release/c4bench                 # benchmark, about 2 minutes
+build/linux-release/c4match                 # strength match, about 10 minutes
+build/linux-release/c4cli play --difficulty hard
+build/linux-release/c4cli analyze --moves 4453 --depth 12
 ```
 
-## WebAssembly
+On Windows use the `release` and `debug` presets from a "Developer PowerShell for VS 2022".
 
-Built with **Emscripten 6.0.12** (pinned; install it with
-`./emsdk install 6.0.12 && ./emsdk activate 6.0.12` and load `emsdk_env.sh`, which sets
-`EMSDK` for the preset). The smoke test was run with Node v24.22.0 (LTS).
+**WebAssembly** (Emscripten 6.0.12, pinned: `./emsdk install 6.0.12 && ./emsdk activate 6.0.12`,
+then load `emsdk_env.sh`):
 
 ```
 cmake --preset wasm
 cmake --build --preset wasm
-node web/scripts/smoke.mjs
+node web/scripts/smoke.mjs                  # smoke test of the web module
+node build/wasm/c4bench.js                  # the benchmark, in WebAssembly
 ```
 
-Output: `build/wasm/c4.js` (ES6 module factory for web, worker and Node) and
-`build/wasm/c4.wasm`. Exported functions, all stateless (pass the whole move string each call):
+The web module exports `c4_choose_move(moves, difficulty, seed)`, the last search's stats,
+`c4_win_score`, `c4_min_win_score` and `c4_winning_cells(moves)`; see `wasm/api.cpp`.
 
-```
-int    c4_choose_move(const char* moves, int difficulty, double seed);  // column 0 to 6, or -1
-double c4_last_depth();     // stats of the last c4_choose_move
-double c4_last_score();
-double c4_last_nodes();
-double c4_last_time_ms();
-double c4_last_nps();
-double c4_win_score();      // score scale: a win at ply p scores c4_win_score() - p
-double c4_min_win_score();  // any score at least this large in size is a proven result
-double c4_winning_cells(const char* moves);  // bit col * 7 + row of the winning cells, or 0
-```
-
-`difficulty` is 0 (Easy) to 3 (Impossible). Call them with `ccall` or `cwrap`, as
-`web/scripts/smoke.mjs` does.
-
-## Web app
-
-A browser game in `web/` (Vite 8.3.3, TypeScript 7.0.2, no framework). The engine runs in a Web
-Worker, so Impossible's 1 s search never freezes the page. Needs the Emscripten setup above;
-`npm run dev` and `npm run build` first run `npm run wasm`, which builds the wasm preset and
-copies `c4.js` and `c4.wasm` into `web/src/wasm/`.
+**Web** (Node 24; `npm run dev` and `npm run build` rebuild and copy the WebAssembly module first):
 
 ```
 cd web
 npm install
-npm run dev       # http://localhost:5173/connect-4-engine/
-npm run build     # type-checks, then writes web/dist/
-npm run preview   # serves web/dist/ at http://localhost:4173/connect-4-engine/
+npm run dev        # http://localhost:5173/connect-4-engine/
+npm run build      # type-checks and writes web/dist/
+npm run preview    # http://localhost:4173/connect-4-engine/
 ```
 
-The site is built for the base path `/connect-4-engine/` (GitHub Pages). After rebuilding the
-WebAssembly module, restart `npm run dev`: in WSL on a `/mnt/c` checkout, Vite does not notice the
-copied files change and keeps serving the old `c4.js`.
+After rebuilding the module, restart `npm run dev` (in WSL on a `/mnt/c` checkout Vite does not
+see the copied files change).
 
-## Continuous integration and deployment
-
-- `.github/workflows/ci.yml` (every push and pull request): native Release build with gcc and
-  the doctest suite on `ubuntu-latest`, plus the WebAssembly build and Node smoke test.
-- `.github/workflows/deploy.yml` (push to `main`): installs Emscripten 6.0.12, builds the module
-  and the site, and publishes `web/dist` to GitHub Pages. Build output is never committed.
-
-## Test
+## Project structure
 
 ```
-ctest --preset release
+engine/include/c4/, engine/src/   the engine library: position, zobrist, score, tt, eval,
+                                  search, difficulty
+tests/                            doctest tests
+bench/bench.cpp, bench/results/   c4bench and recorded runs
+match/match.cpp                   c4match (difficulty strength match)
+tune/tune.cpp                     c4tune (evaluation tuning)
+cli/cli.cpp                       c4cli (analyze, play)
+wasm/api.cpp                      the WebAssembly API
+web/                              browser game (index.html, src/*.ts, src/style.css)
+web/scripts/smoke.mjs             Node smoke test for the WebAssembly module
+.github/workflows/                CI and Pages deployment
 ```
 
-or run the test binary directly for doctest's full output:
+## Design tradeoffs
 
-```
-build/release/c4tests
-```
+- **Zobrist hash, not the perfect 64-bit key.** A Connect-4 position has an exact 64-bit
+  encoding, but its low bits describe only the first columns, so it indexes a table badly.
+  Zobrist bits are uniformly mixed, and the TT stores the full hash to reject slot collisions.
+- **Always-replace TT.** Simplest policy; its cost is a shorter principal variation on deep
+  searches, never a wrong move or score.
+- **Copy-make instead of make-unmake.** A 32-byte copy per node removes all undo code.
+- **Exact root scores for difficulty levels.** Each root move gets a full-window search, which
+  costs more than one alpha-beta search but lets the levels tell a near-best move from a
+  blunder.
+- **Stateless WebAssembly API.** JavaScript passes the whole move string each call, so undo and
+  new game need no engine state and the page cannot drift out of sync with the engine.
+- **No killer moves or history heuristic.** About 80% of cutoffs already come from the first move
+  tried, and nothing is optimized without a benchmark showing it matters.
 
-## CLI
+## Future work
 
-```
-c4cli analyze [--moves 4453] [--depth N] [--time MS]
-c4cli play [--engine-first] [--difficulty easy|medium|hard|impossible]
-```
-
-Moves are digits 1 to 7, one per ply, X first. `analyze` runs one full search; without `--depth`
-or `--time` it thinks for 1 second. `play` starts a game in the terminal; you are X unless
-`--engine-first` is given, and the engine plays at `--difficulty` (default `impossible`):
-
-| Level | How it picks a move |
-|---|---|
-| Easy | Searches 1 ply, then picks at random, weighted toward better moves (softmax). Takes a win in one and blocks a loss in one, otherwise makes mistakes. |
-| Medium | Searches 3, 4 or 5 plies (random each move), then picks at random among moves within 3 points of the best. |
-| Hard | Searches 7 plies and plays a best move (random among ties). |
-| Impossible | Searches at least 10 plies, then deeper until 1 second is used or the result is proven; plays the most central best move. |
-
-Details: [DESIGN.md](DESIGN.md#difficulty-levels).
-
-Example (`build/release/c4cli analyze --moves 4453 --depth 16`, Windows 11 ARM64 laptop, Release
-build):
-
-```
-. . . . . . .
-. . . . . . .
-. . . . . . .
-. . . . . . .
-. . . O . . .
-. . O X X . .
-1 2 3 4 5 6 7
-X to move
-
-depth  score   best  nodes        ms
-    1       4     5           8       0.0
-    2      -2     6          40       0.0
-    3       7     4         127       0.0
-    4      -2     4         379       0.1
-    5       7     4         924       0.1
-    6      -2     4        2033       0.3
-    7       7     4        4533       0.6
-    8      -3     4        9437       1.2
-    9       6     4       17190       2.1
-   10      -3     4       32012       3.5
-   11       7     4       55651       6.1
-   12      -3     4       98493      10.7
-   13       7     4      169813      18.5
-   14      -2     4      275282      28.1
-   15       5     4      452766      47.5
-   16      -1     4      674861      68.3
-
-Best move: 4
-Score: -1 (heuristic)
-Principal variation: 4 4 4 3 3
-Nodes: 674861 in 68.3 ms (9.88 M nodes/s), TT hit rate 65.7%
-```
-
-Scores are from the side to move's point of view, in evaluation units; proven results print as
-"win in N plies" or "loss in N plies". Scores alternate between odd and even depths because the
-evaluation favors whoever moved last.
-
-## Evaluation tuning
-
-```
-c4tune [--depth 4]
-```
-
-Hill climbing on engine-vs-engine matches: each round changes one evaluation weight by +1 or -1
-and keeps the change only if it scores above 55% against the current weights over all 49
-two-ply openings, each played twice with colors swapped (98 games). 60 rounds at depth 4, then
-the final weights play the original ones at depth 4 and at depth 6, a depth tuning never used.
-Method and discussion: [DESIGN.md](DESIGN.md#evaluation-tuning).
-
-**Result: tuning found no improvement, so the default weights are unchanged.** No candidate
-reached 55%; the best, centerStone 3 to 4, scored 52.6%. Excerpt of the real output (the engine
-is deterministic, so this is the same on any machine; it was produced on a Windows 11 ARM64
-laptop, Release build). Rounds 7 to 60 repeat rounds 1 to 6 exactly and are left out:
-
-```
-Tuning depth 4, 60 rounds, step 1, accept above 55%
-Start: {threeOpen 5, twoOpen 2, centerStone 3}
-Sanity check, defaults vs defaults: +41 =16 -41, 49.0 / 98 (50.0%)
-
-Round  1: threeOpen +1 vs best: +38 =15 -45, 45.5 / 98 (46.4%)
-Round  2: threeOpen -1 vs best: +39 =13 -46, 45.5 / 98 (46.4%)
-Round  3: twoOpen +1 vs best: +41 =11 -46, 46.5 / 98 (47.4%)
-Round  4: twoOpen -1 vs best: +37 =11 -50, 42.5 / 98 (43.4%)
-Round  5: centerStone +1 vs best: +46 =11 -41, 51.5 / 98 (52.6%)
-Round  6: centerStone -1 vs best: +34 =18 -46, 43.0 / 98 (43.9%)
-
-0 of 60 changes accepted. Final: {threeOpen 5, twoOpen 2, centerStone 3}
-Final vs original at the tuning depth: +41 =16 -41, 49.0 / 98 (50.0%)
-Final vs original at the validation depth (6): +42 =14 -42, 49.0 / 98 (50.0%)
-```
-
-Both final matches are the defaults playing themselves, so 50% is expected.
-
-## Benchmark
-
-```
-c4bench [--depths 2,4,6,8,10,12,14,16] [--positions 100] [--ablation-depth 10]
-```
-
-The defaults are shown. The seed and TT size are fixed constants, so runs are comparable. Besides
-the search tables, the bench runs every difficulty level on the same positions (about two minutes,
-mostly Impossible's 1 second budget).
-Recorded runs live in [bench/results](bench/results).
-
-### Results: WSL2 Ubuntu, gcc, Snapdragon ARM64, Release
-
-Verbatim output of `build/linux-release/c4bench` with default flags (gcc 15.2, WSL2 Ubuntu 26.04
-on a Snapdragon X laptop), from
-[bench/results/wsl2-ubuntu-gcc-arm64-release.md](bench/results/wsl2-ubuntu-gcc-arm64-release.md).
-Only its title line is replaced by the heading above. Recorded on battery power: timings varied by
-about 40% between repeated runs, while node counts are exact and identical to the MSVC run in
-[bench/results/windows11-arm64-release.md](bench/results/windows11-arm64-release.md).
-
-100 random positions of 4 to 16 plies (fixed seed), one search per position, TT of 2^20 entries cleared before every search. Times are per search, i.e. per move.
-
-## Time per move by depth (all techniques on)
-
-| Depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s | TT hit rate | First-move cutoff rate |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 26 | 0.013 | 0.013 | 0.038 | 2.00 | 12.4% | 87.0% |
-| 4 | 213 | 0.050 | 0.051 | 0.310 | 4.28 | 36.1% | 82.6% |
-| 6 | 1153 | 0.185 | 0.178 | 0.714 | 6.22 | 45.6% | 81.6% |
-| 8 | 4897 | 0.804 | 0.674 | 4.025 | 6.09 | 50.9% | 81.6% |
-| 10 | 17813 | 2.597 | 2.039 | 18.073 | 6.86 | 52.9% | 80.3% |
-| 12 | 56312 | 10.149 | 6.000 | 83.674 | 5.55 | 54.7% | 79.1% |
-| 14 | 167655 | 35.978 | 19.557 | 297.971 | 4.66 | 54.3% | 77.0% |
-| 16 | 490270 | 90.407 | 24.576 | 1565.364 | 5.42 | 52.2% | 73.9% |
-
-## Ablation (one technique off at a time)
-
-| Configuration | Depth | Mean nodes | Nodes vs all on | Mean ms | M nodes/s | TT hit rate | First-move cutoff rate |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| All on | 10 | 17813 | 1.0x | 2.682 | 6.64 | 52.9% | 80.3% |
-| No alpha-beta | 10 | 1967171 | 110.4x | 474.401 | 4.15 | 61.7% | n/a |
-| No transposition table | 10 | 64754 | 3.6x | 9.443 | 6.86 | n/a | 70.5% |
-| No move ordering | 10 | 235149 | 13.2x | 57.397 | 4.10 | 57.5% | 32.5% |
-| No iterative deepening | 10 | 15768 | 0.9x | 3.356 | 4.70 | 26.0% | 65.0% |
-| All on | 7 | 2483 | 1.0x | 0.413 | 6.01 | 49.6% | 82.6% |
-| All off (pure minimax) | 7 | 276450 | 111.4x | 76.377 | 3.62 | n/a | n/a |
-
-## Difficulty levels (chooseMove)
-
-| Level | Mean depth | Mean nodes | Mean ms | Median ms | Max ms | M nodes/s |
-|---|---:|---:|---:|---:|---:|---:|
-| Easy | 1.0 | 7 | 0.006 | 0.004 | 0.086 | n/a |
-| Medium | 3.9 | 421 | 0.077 | 0.038 | 0.356 | 5.46 |
-| Hard | 7.0 | 4936 | 0.827 | 0.663 | 4.566 | 5.97 |
-| Impossible | 15.4 | 2810993 | 550.156 | 1000.092 | 1002.772 | 5.11 |
-
+- Odd/even threat parity in the evaluation, the biggest known gap in Connect-4 play.
+- Depth-preferred TT replacement, to keep the principal variation intact on deep searches.
+- A wider tuning search (larger steps, three-ply openings) before claiming any weight change.
+- An opening book or a solved-position database, so Impossible plays perfectly from the start.
