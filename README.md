@@ -295,3 +295,4 @@ web/scripts/smoke.mjs             Node smoke test for the WebAssembly module
 - Depth-preferred TT replacement, to keep the principal variation intact on deep searches.
 - A wider tuning search (larger steps, three-ply openings) before claiming any weight change.
 - An opening book or a solved-position database, so Impossible plays perfectly from the start.
+- Solver-style pruning (never play below an opponent's threat) with threat-count move ordering.
